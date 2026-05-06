@@ -22,7 +22,8 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
 
-const USERS_FILE = path.join(__dirname, '..', 'data', 'users.json');
+const BASE_DIR = process.env.VERCEL ? '/tmp' : path.join(__dirname, '..');
+const USERS_FILE = path.join(BASE_DIR, process.env.VERCEL ? 'users.json' : 'data/users.json');
 
 // ─── Helper: Read users from file ────────────────────────────────────────────
 function readUsers() {

@@ -21,8 +21,9 @@ const { analyzeImage } = require('../utils/aiAnalysis');
 const { extractLocationFromImage, parseManualLocation } = require('../utils/exifLocation');
 const authRouter = require('./auth');
 
-const REPORTS_FILE = path.join(__dirname, '..', 'data', 'reports.json');
-const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
+const BASE_DIR = process.env.VERCEL ? '/tmp' : path.join(__dirname, '..');
+const REPORTS_FILE = path.join(BASE_DIR, process.env.VERCEL ? 'reports.json' : 'data/reports.json');
+const UPLOADS_DIR = path.join(BASE_DIR, 'uploads');
 
 // ─── Multer Configuration ──────────────────────────────────────────────────────
 // FIX: Properly configured multer with file type validation
