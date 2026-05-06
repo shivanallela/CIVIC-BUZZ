@@ -22,9 +22,11 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // ─── Ensure data directories exist ───────────────────────────────────────────
-const DATA_DIR = path.join(__dirname, 'data');
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
-const SESSIONS_DIR = path.join(__dirname, 'sessions');
+const BASE_DIR = process.env.VERCEL ? '/tmp' : __dirname;
+const DATA_DIR = path.join(BASE_DIR, process.env.VERCEL ? '' : 'data');
+const UPLOADS_DIR = path.join(BASE_DIR, 'uploads');
+const SESSIONS_DIR = path.join(BASE_DIR, 'sessions');
+
 
 [DATA_DIR, UPLOADS_DIR, SESSIONS_DIR].forEach(dir => {
   if (!fs.existsSync(dir)) {
