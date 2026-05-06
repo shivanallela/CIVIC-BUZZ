@@ -4,7 +4,7 @@
  * FIX: All requests include credentials: 'include' for session cookies.
  */
 
-const API_BASE = import.meta.env.DEV ? '' : '';
+const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
 
 async function apiFetch(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
