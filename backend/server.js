@@ -171,15 +171,20 @@ app.use((err, req, res, next) => {
 });
 
 // ─── Start server ─────────────────────────────────────────────────────────────
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n🚀 CivicLink Backend running on port ${PORT}`);
-  console.log(`📁 Data dir: ${DATA_DIR}`);
-  console.log(`🖼️  Uploads dir: ${UPLOADS_DIR}`);
-  console.log(`🔐 Sessions dir: ${SESSIONS_DIR}\n`);
-  
-  // Re-hash demo users with correct passwords on first start
-  initializeDemoUsers();
-});
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n🚀 CivicLink Backend running on port ${PORT}`);
+    console.log(`📁 Data dir: ${DATA_DIR}`);
+    console.log(`🖼️  Uploads dir: ${UPLOADS_DIR}`);
+    console.log(`🔐 Sessions dir: ${SESSIONS_DIR}\n`);
+    
+    // Re-hash demo users with correct passwords on first start
+    initializeDemoUsers();
+  });
+}
+
+// Export for Vercel Serverless
+module.exports = app;
 
 /**
  * FIX: Initialize demo users with properly hashed passwords.
