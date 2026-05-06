@@ -150,7 +150,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Serve React app for all non-API routes (SPA fallback)
-app.get('*', (req, res) => {
+app.get('/(.*)', (req, res) => {
   if (req.path.startsWith('/api')) {
     return res.status(404).json({ error: 'API route not found' });
   }
