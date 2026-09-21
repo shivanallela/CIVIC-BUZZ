@@ -1,13 +1,13 @@
 """
-Nivaaran AI — FastAPI Backend
-Phase 1: Demo session endpoints + Supabase Medical Inventory API
+Civic Catalyst — FastAPI Backend
+AI-assisted Citizen Civic Issue Reporting Platform
 """
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from routers import demo, inventory, complaints
+from routers import demo, complaints
 from models.schemas import HealthResponse
 
 load_dotenv()
@@ -15,8 +15,8 @@ load_dotenv()
 # ── App ──────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
-    title="Civic Catalyst API",
-    description="AI-assisted civic issue reporting platform & Supabase Medical Inventory System.",
+    title="Civic Catalyst Citizen API",
+    description="AI-assisted civic issue reporting & citizen engagement platform.",
     version="0.1.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -47,7 +47,6 @@ app.add_middleware(
 # ── Routers ──────────────────────────────────────────────────────────────────
 
 app.include_router(demo.router)
-app.include_router(inventory.router)
 app.include_router(complaints.router)
 
 # ── Core endpoints ───────────────────────────────────────────────────────────
@@ -58,7 +57,7 @@ async def health_check():
     """Service health check endpoint."""
     return HealthResponse(
         status="ok",
-        service="Civic Catalyst API (Supabase Connected)",
+        service="Civic Catalyst Citizen API",
         version="0.1.0",
     )
 
@@ -66,7 +65,7 @@ async def health_check():
 @app.get("/", tags=["system"])
 async def root():
     return {
-        "message": "Civic Catalyst API is running with Supabase backend.",
+        "message": "Civic Catalyst Citizen API is running.",
         "docs": "/api/docs",
         "version": "0.1.0",
     }

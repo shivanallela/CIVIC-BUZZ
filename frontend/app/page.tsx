@@ -2,29 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getSession, isVillager, isPanchayatOfficial, isAshaWorker } from "@/services/demoSession";
+import { getSession } from "@/services/demoSession";
 import { CivicLogo } from "@/components/CivicLogo";
 import { LoginForm } from "@/components/LoginForm";
 import { LanguageSelector } from "@/components/LanguageSelector";
-import { Zap, Users, Building2, ShieldCheck } from "lucide-react";
+import { Camera, MapPin, CloudSun, TrendingUp, ShieldCheck } from "lucide-react";
 
 export default function LandingPage() {
   const router = useRouter();
   const [checked, setChecked] = useState(false);
 
-  // If a session already exists, redirect to the correct dashboard
+  // If a session exists, route straight to citizen dashboard
   useEffect(() => {
     const s = getSession();
     if (s) {
-      if (isVillager(s)) {
-        router.replace("/citizen/dashboard");
-      } else if (isPanchayatOfficial(s)) {
-        router.replace("/panchayat/dashboard");
-      } else if (isAshaWorker(s)) {
-        router.replace("/asha/dashboard");
-      } else {
-        router.replace("/citizen/dashboard");
-      }
+      router.replace("/citizen/dashboard");
     } else {
       setChecked(true);
     }
@@ -52,7 +44,7 @@ export default function LandingPage() {
           <LanguageSelector variant="landing" />
           <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-900 border border-emerald-300 inline-flex items-center gap-1.5 shadow-2xs">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-            Live Platform
+            Citizen Portal
           </span>
         </div>
       </header>
@@ -72,55 +64,71 @@ export default function LandingPage() {
             &ldquo;Empowering every citizen&apos;s voice into action.&rdquo;
           </p>
           <p className="text-slate-600 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
-            AI-powered Rural Governance & Healthcare Supply Chain. Select a demo account below or enter your credentials to sign in.
+            AI-powered Citizen Civic Issue Reporting Portal. Report village hazards with photo evidence and GPS, check local weather, and track mandi market prices.
           </p>
         </section>
 
-        {/* ── Interactive Login System with Visible Demo Credentials ─────────── */}
+        {/* ── Interactive Login System ───────────────────────────────────────── */}
         <section id="login-section" className="mb-8">
           <LoginForm />
         </section>
 
-        {/* ── How it connects ────────────────────────────────────────────────── */}
+        {/* ── Citizen Features Highlights ────────────────────────────────────── */}
         <section className="mb-6">
           <div className="bg-white rounded-3xl border border-emerald-200/80 p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-wider text-emerald-950 mb-3 text-center">
-              How Civic Catalyst connects communities
+            <p className="text-xs font-bold uppercase tracking-wider text-emerald-950 mb-4 text-center">
+              Citizen Portal Highlights
             </p>
-            <div className="flex items-center justify-between gap-2">
-              {/* Villager */}
-              <div className="flex flex-col items-center gap-1.5 flex-1">
-                <div className="h-11 w-11 rounded-xl bg-emerald-100 flex items-center justify-center border border-emerald-200 text-emerald-900">
-                  <Users className="h-5 w-5" />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {/* Feature 1 */}
+              <div className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-900">
+                  <Camera className="h-5 w-5" />
                 </div>
                 <p className="text-xs font-bold text-slate-800 text-center">
-                  Villager
+                  AI Vision
                 </p>
                 <p className="text-[11px] text-slate-500 text-center leading-tight">
-                  Reports hazards via AI Vision
+                  Auto-detect road, water & wire hazards
                 </p>
               </div>
 
-              {/* Arrow + AI */}
-              <div className="flex flex-col items-center gap-1">
-                <div className="h-8 w-8 rounded-full bg-emerald-900 flex items-center justify-center shadow-xs text-white">
-                  <Zap className="h-4 w-4" />
+              {/* Feature 2 */}
+              <div className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-900">
+                  <MapPin className="h-5 w-5" />
                 </div>
-                <p className="text-[9px] font-extrabold text-emerald-900 uppercase tracking-wider">
-                  AI Triage
+                <p className="text-xs font-bold text-slate-800 text-center">
+                  GPS Geotagging
+                </p>
+                <p className="text-[11px] text-slate-500 text-center leading-tight">
+                  Pinpoint exact issue locations
                 </p>
               </div>
 
-              {/* Panchayat */}
-              <div className="flex flex-col items-center gap-1.5 flex-1">
-                <div className="h-11 w-11 rounded-xl bg-emerald-950 flex items-center justify-center border border-emerald-900 text-white">
-                  <Building2 className="h-5 w-5" />
+              {/* Feature 3 */}
+              <div className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                <div className="h-10 w-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-900">
+                  <CloudSun className="h-5 w-5" />
                 </div>
                 <p className="text-xs font-bold text-slate-800 text-center">
-                  Gram Panchayat
+                  Live Weather
                 </p>
                 <p className="text-[11px] text-slate-500 text-center leading-tight">
-                  30-Min Rapid SLA Resolution
+                  7-day forecast & farm advisories
+                </p>
+              </div>
+
+              {/* Feature 4 */}
+              <div className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                <div className="h-10 w-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-900">
+                  <TrendingUp className="h-5 w-5" />
+                </div>
+                <p className="text-xs font-bold text-slate-800 text-center">
+                  Mandi Rates
+                </p>
+                <p className="text-[11px] text-slate-500 text-center leading-tight">
+                  Live crop prices across mandis
                 </p>
               </div>
             </div>
@@ -130,7 +138,7 @@ export default function LandingPage() {
 
       <footer className="text-center py-5 px-4 border-t border-slate-200/60 bg-white">
         <p className="text-xs text-slate-400">
-          Civic Catalyst &nbsp;·&nbsp; Smart Rural Governance Platform
+          Civic Catalyst &nbsp;·&nbsp; Citizen Civic Engagement Portal
         </p>
       </footer>
     </div>

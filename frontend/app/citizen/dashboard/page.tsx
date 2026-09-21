@@ -143,17 +143,17 @@ export default function CitizenDashboard() {
   const [detectingLocation, setDetectingLocation] = useState(false);
   const [locationDetected, setLocationDetected] = useState(false);
 
-  // ASHA Worker Live Announcements & Notifications State
-  const [ashaAnnouncements, setAshaAnnouncements] = useState<any[]>([]);
+  // Village Live Announcements & Notifications State
+  const [villageAnnouncements, setVillageAnnouncements] = useState<any[]>([]);
   const [activeBannerAnnc, setActiveBannerAnnc] = useState<any | null>(null);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
-  const loadAshaAnnouncements = () => {
+  const loadVillageAnnouncements = () => {
     try {
-      const stored = localStorage.getItem("civic_asha_announcements");
+      const stored = localStorage.getItem("civic_village_announcements");
       if (stored) {
         const parsed = JSON.parse(stored);
-        setAshaAnnouncements(parsed);
+        setVillageAnnouncements(parsed);
         if (parsed.length > 0) {
           setActiveBannerAnnc(parsed[0]);
         }
@@ -161,18 +161,18 @@ export default function CitizenDashboard() {
         const defaultAnnc = [
           {
             id: "ANNC-2026-001",
-            title: "📢 National Pulse Polio Drive Active Today!",
-            category: "Polio Vaccination",
-            location: "Ward 3 PHC Sub-Center & Door-to-Door",
-            message: "Special Pulse Polio booth is active today. All children aged 0-5 years must receive 2 oral polio drops. ASHA workers are visiting homes.",
+            title: "📢 National Pulse Polio & Health Drive Active Today!",
+            category: "Public Health",
+            location: "Ward 3 Primary Health Center & Door-to-Door",
+            message: "Special Pulse Polio booth is active today. All children aged 0-5 years must receive 2 oral polio drops.",
             priority: "Urgent",
-            posted_by: "Sunita Devi (ASHA Worker)",
+            posted_by: "Village Public Health Administration",
             created_at: "Today, 08:30 AM",
             unread: true,
           }
         ];
-        localStorage.setItem("civic_asha_announcements", JSON.stringify(defaultAnnc));
-        setAshaAnnouncements(defaultAnnc);
+        localStorage.setItem("civic_village_announcements", JSON.stringify(defaultAnnc));
+        setVillageAnnouncements(defaultAnnc);
         setActiveBannerAnnc(defaultAnnc[0]);
       }
     } catch (e) {
@@ -181,13 +181,13 @@ export default function CitizenDashboard() {
   };
 
   useEffect(() => {
-    loadAshaAnnouncements();
-    const handleSync = () => loadAshaAnnouncements();
+    loadVillageAnnouncements();
+    const handleSync = () => loadVillageAnnouncements();
     window.addEventListener("storage", handleSync);
-    window.addEventListener("asha_announcement_posted", handleSync);
+    window.addEventListener("village_announcement_posted", handleSync);
     return () => {
       window.removeEventListener("storage", handleSync);
-      window.removeEventListener("asha_announcement_posted", handleSync);
+      window.removeEventListener("village_announcement_posted", handleSync);
     };
   }, []);
 
@@ -502,13 +502,13 @@ export default function CitizenDashboard() {
             </button>
             <button
               className="topbar-icon-btn"
-              title="Notifications & ASHA Alerts"
+              title="Notifications & Village Announcements"
               onClick={() => setShowNotifDropdown(!showNotifDropdown)}
               style={{ position: "relative" }}
             >
               <Bell style={{ width: 15, height: 15 }} />
-              {ashaAnnouncements.length > 0 && (
-                <span className="topbar-notif-dot">{ashaAnnouncements.length}</span>
+              {villageAnnouncements.length > 0 && (
+                <span className="topbar-notif-dot">{villageAnnouncements.length}</span>
               )}
             </button>
 
@@ -531,7 +531,7 @@ export default function CitizenDashboard() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem", borderBottom: "1px solid #f1f5f9", paddingBottom: "0.5rem" }}>
                   <div style={{ fontSize: "0.9rem", fontWeight: 800, color: "#0f172a", display: "flex", alignItems: "center", gap: "0.4rem" }}>
                     <Bell size={16} style={{ color: "#0d9488" }} />
-                    Live ASHA Health Broadcasts
+                    Village Announcements
                   </div>
                   <button onClick={() => setShowNotifDropdown(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b" }}>
                     <X size={16} />
@@ -539,10 +539,10 @@ export default function CitizenDashboard() {
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", maxHeight: "280px", overflowY: "auto" }}>
-                  {ashaAnnouncements.length === 0 ? (
-                    <div style={{ fontSize: "0.78rem", color: "#64748b", textAlign: "center", padding: "1rem" }}>No active health notifications</div>
+                  {villageAnnouncements.length === 0 ? (
+                    <div style={{ fontSize: "0.78rem", color: "#64748b", textAlign: "center", padding: "1rem" }}>No active notifications</div>
                   ) : (
-                    ashaAnnouncements.map((annc) => (
+                    villageAnnouncements.map((annc) => (
                       <div
                         key={annc.id}
                         onClick={() => {
@@ -627,7 +627,7 @@ export default function CitizenDashboard() {
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem", flexWrap: "wrap" }}>
                         <span style={{ background: "#fef08a", color: "#854d0e", padding: "0.15rem 0.65rem", borderRadius: "999px", fontSize: "0.68rem", fontWeight: 900 }}>
-                          📢 LIVE ASHA HEALTH ANNOUNCEMENT
+                          📢 LIVE VILLAGE ANNOUNCEMENT
                         </span>
                         <span style={{ background: "rgba(255,255,255,0.2)", padding: "0.15rem 0.55rem", borderRadius: "999px", fontSize: "0.68rem", fontWeight: 800 }}>
                           📍 {activeBannerAnnc.location}

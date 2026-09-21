@@ -10,9 +10,6 @@ import {
 } from "@/services/demoSession";
 import {
   Users,
-  Building2,
-  HeartPulse,
-  Hospital,
   Lock,
   Mail,
   Eye,
@@ -60,7 +57,7 @@ export function LoginForm() {
     setTimeout(() => {
       setSessionByAccount(acc);
       router.push(acc.redirectUrl);
-    }, 400);
+    }, 300);
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
@@ -76,7 +73,7 @@ export function LoginForm() {
         setError(res.error);
         setLoading(false);
       }
-    }, 350);
+    }, 300);
   };
 
   return (
@@ -97,9 +94,6 @@ export function LoginForm() {
         >
           <Lock className="h-4 w-4 text-emerald-700" />
           <span>Credential Login</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-900 font-extrabold">
-            Credentials Below
-          </span>
         </button>
 
         <button
@@ -115,11 +109,11 @@ export function LoginForm() {
           }`}
         >
           <Zap className="h-4 w-4 text-amber-500" />
-          <span>1-Click Role Access</span>
+          <span>1-Click Citizen Portal Access</span>
         </button>
       </div>
 
-      {/* ── Tab 1: Credential Login with visible accounts ──────────────────── */}
+      {/* ── Tab 1: Credential Login ────────────────────────────────────────── */}
       {activeTab === "credentials" ? (
         <div className="p-5 sm:p-7 space-y-6">
           {/* Main Login Form */}
@@ -158,7 +152,7 @@ export function LoginForm() {
                   Password
                 </label>
                 <span className="text-[11px] text-emerald-800 font-semibold">
-                  Demo password autofill available
+                  Default demo: citizen123
                 </span>
               </div>
               <div className="relative">
@@ -198,120 +192,70 @@ export function LoginForm() {
               ) : (
                 <>
                   <ShieldCheck className="h-4 w-4" />
-                  <span>Sign In to Dashboard</span>
+                  <span>Enter Citizen Portal</span>
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
             </button>
           </form>
 
-          {/* ── Visibly Provided Credentials Section ─────────────────────── */}
+          {/* ── Demo Credentials Section ─────────────────────────────────── */}
           <div className="pt-4 border-t border-slate-100">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-1.5">
                 <Sparkles className="h-4 w-4 text-emerald-700" />
                 <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-900">
-                  Demo Accounts & Credentials
+                  Citizen Demo Account
                 </h3>
               </div>
               <span className="text-[11px] text-slate-500 font-semibold">
-                Click any card to autofill or 1-click sign in
+                Click to autofill
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-3">
               {DEMO_ACCOUNTS.map((acc) => {
                 const isSelected = selectedAccId === acc.id;
-                let IconComponent = Users;
-                if (acc.role === "panchayat_official") IconComponent = Building2;
-                else if (acc.id.includes("mandal")) IconComponent = Hospital;
-                else if (acc.role === "asha_worker") IconComponent = HeartPulse;
 
                 return (
                   <div
                     key={acc.id}
-                    className={`rounded-2xl p-3.5 border-2 transition-all text-left relative flex flex-col justify-between ${
+                    className={`rounded-2xl p-4 border-2 transition-all text-left relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                       isSelected
                         ? "border-emerald-700 bg-emerald-50/60 shadow-xs"
                         : "border-slate-200 bg-slate-50/50 hover:border-slate-300 hover:bg-slate-50"
                     }`}
                   >
-                    <div>
-                      {/* Top Row: Icon + Badge */}
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`h-7 w-7 rounded-lg flex items-center justify-center text-white ${
-                              acc.role === "villager"
-                                ? "bg-emerald-700"
-                                : acc.role === "panchayat_official"
-                                ? "bg-emerald-950"
-                                : acc.id.includes("mandal")
-                                ? "bg-cyan-700"
-                                : "bg-teal-700"
-                            }`}
-                          >
-                            <IconComponent className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <h4 className="text-xs font-bold text-slate-900 leading-tight">
-                              {acc.name}
-                            </h4>
-                            <p className="text-[10px] text-slate-500">{acc.roleTitle}</p>
-                          </div>
-                        </div>
-                        <span
-                          className={`text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full border ${acc.badgeColor}`}
-                        >
-                          {acc.badge}
-                        </span>
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl flex items-center justify-center text-white bg-emerald-700 shrink-0">
+                        <Users className="h-5 w-5" />
                       </div>
-
-                      {/* Credentials Display with Copy */}
-                      <div className="bg-white rounded-xl p-2 border border-slate-200/80 mb-2.5 text-[11px] space-y-1">
-                        <div className="flex items-center justify-between text-slate-600">
-                          <span className="font-mono text-slate-800 font-semibold truncate pr-1">
-                            {acc.email}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(acc.email, `${acc.id}-email`)}
-                            className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 transition-colors"
-                            title="Copy email"
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-bold text-slate-900 leading-tight">
+                            {acc.name}
+                          </h4>
+                          <span
+                            className={`text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full border ${acc.badgeColor}`}
                           >
-                            {copiedField === `${acc.id}-email` ? (
-                              <Check className="h-3 w-3 text-emerald-600" />
-                            ) : (
-                              <Copy className="h-3 w-3" />
-                            )}
-                          </button>
+                            {acc.badge}
+                          </span>
                         </div>
-                        <div className="flex items-center justify-between text-slate-500 pt-0.5 border-t border-slate-100">
-                          <span className="font-mono text-slate-700">
-                            pwd: <strong className="text-emerald-950">{acc.password}</strong>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(acc.password, `${acc.id}-pwd`)}
-                            className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 transition-colors"
-                            title="Copy password"
-                          >
-                            {copiedField === `${acc.id}-pwd` ? (
-                              <Check className="h-3 w-3 text-emerald-600" />
-                            ) : (
-                              <Copy className="h-3 w-3" />
-                            )}
-                          </button>
+                        <p className="text-xs text-slate-500 mt-0.5">{acc.description}</p>
+                        <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-600 font-mono">
+                          <span>{acc.email}</span>
+                          <span className="text-slate-300">•</span>
+                          <span>pwd: <strong className="text-emerald-900">{acc.password}</strong></span>
                         </div>
                       </div>
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex items-center gap-1.5 pt-1">
+                    <div className="flex items-center gap-2 shrink-0">
                       <button
                         type="button"
                         onClick={() => handleAutofill(acc)}
-                        className="flex-1 py-1.5 px-2 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-700 hover:text-slate-900 transition-all text-center"
+                        className="py-1.5 px-3 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-xs font-bold text-slate-700 hover:text-slate-900 transition-all text-center"
                       >
                         Autofill
                       </button>
@@ -319,10 +263,10 @@ export function LoginForm() {
                         type="button"
                         onClick={() => handleQuickLogin(acc)}
                         disabled={loading}
-                        className="flex-1 py-1.5 px-2 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white text-[11px] font-extrabold flex items-center justify-center gap-1 shadow-xs transition-all"
+                        className="py-1.5 px-3 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-extrabold flex items-center justify-center gap-1 shadow-xs transition-all"
                       >
-                        <span>⚡ Sign In</span>
-                        <ArrowRight className="h-3 w-3" />
+                        <span>⚡ Direct Sign In</span>
+                        <ArrowRight className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </div>
@@ -334,59 +278,37 @@ export function LoginForm() {
       ) : (
         /* ── Tab 2: 1-Click Role Direct Cards ─────────────────────────────── */
         <div className="p-5 sm:p-7 space-y-3.5">
-          {DEMO_ACCOUNTS.map((acc) => {
-            let IconComponent = Users;
-            let themeGradient = "from-emerald-50 to-teal-50 hover:border-emerald-600";
-            let iconBg = "bg-emerald-800 text-white";
-
-            if (acc.role === "panchayat_official") {
-              IconComponent = Building2;
-              themeGradient = "from-slate-50 to-emerald-50 hover:border-emerald-800";
-              iconBg = "bg-emerald-950 text-white";
-            } else if (acc.id.includes("mandal")) {
-              IconComponent = Hospital;
-              themeGradient = "from-cyan-50 to-emerald-50 hover:border-cyan-600";
-              iconBg = "bg-cyan-800 text-white";
-            } else if (acc.role === "asha_worker") {
-              IconComponent = HeartPulse;
-              themeGradient = "from-teal-50 to-emerald-50 hover:border-teal-600";
-              iconBg = "bg-teal-800 text-white";
-            }
-
-            return (
-              <button
-                key={acc.id}
-                type="button"
-                onClick={() => handleQuickLogin(acc)}
-                disabled={loading}
-                className={`w-full group cursor-pointer text-left rounded-2xl p-4 border-2 border-slate-200 bg-gradient-to-r ${themeGradient} hover:shadow-md transition-all duration-200 flex items-center justify-between gap-3`}
-              >
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <div
-                    className={`h-11 w-11 rounded-xl ${iconBg} flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform`}
-                  >
-                    <IconComponent className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <h4 className="text-sm font-extrabold text-slate-900 group-hover:text-emerald-950 truncate">
-                        {acc.roleTitle}
-                      </h4>
-                      <span className="text-[10px] font-bold text-slate-500 hidden sm:inline">
-                        ({acc.name})
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-600 truncate">{acc.description}</p>
-                  </div>
+          {DEMO_ACCOUNTS.map((acc) => (
+            <button
+              key={acc.id}
+              type="button"
+              onClick={() => handleQuickLogin(acc)}
+              disabled={loading}
+              className="w-full group cursor-pointer text-left rounded-2xl p-5 border-2 border-emerald-300 bg-gradient-to-r from-emerald-50 to-teal-50 hover:shadow-md transition-all duration-200 flex items-center justify-between gap-3"
+            >
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="h-12 w-12 rounded-xl bg-emerald-800 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                  <Users className="h-6 w-6" />
                 </div>
-
-                <div className="flex items-center gap-1.5 shrink-0 text-xs font-extrabold text-emerald-900 pl-2">
-                  <span className="hidden sm:inline">Direct Enter</span>
-                  <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h4 className="text-base font-extrabold text-slate-900 group-hover:text-emerald-950 truncate">
+                      {acc.roleTitle}
+                    </h4>
+                    <span className="text-xs font-bold text-slate-500">
+                      ({acc.name})
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 truncate">{acc.description}</p>
                 </div>
-              </button>
-            );
-          })}
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0 text-xs font-extrabold text-emerald-900 pl-2">
+                <span>Enter Portal</span>
+                <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </button>
+          ))}
         </div>
       )}
     </div>

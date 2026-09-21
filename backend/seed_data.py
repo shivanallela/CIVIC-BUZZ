@@ -225,6 +225,24 @@ def seed_database(force=False):
                 VALUES (?, 'EXPIRING_SOON', 'WARNING', ?, ?);
                 """, (i_id, f"⏳ EXPIRING SOON: {i_name} expires in {days_left} days ({exp_date_str}).", now_str))
 
+    # 6. Seed Sample Medicine Requests
+    cursor.execute("DELETE FROM medicine_requests;")
+    med_reqs = [
+        ("REQ-ASHA-0001", "Sunita Devi (Ward 3 & 4)", "Paracetamol 125mg Syrup", 30, 30, 30, "Bottles", "Urgent", "Zero stock remaining, viral fever reported among infants in Ward 3.", "Approved and dispatched by Mandal Hospital", "DISPATCHED", (now - timedelta(days=2)).strftime("%Y-%m-%d")),
+        ("REQ-ASHA-0002", "Sunita Devi (Ward 3 & 4)", "Amoxicillin 250mg Syrup", 25, 25, 0, "Bottles", "High", "Critical shortage for pediatric bacterial infections.", "Approved, pending dispatch from depot.", "APPROVED", None),
+        ("REQ-ASHA-0003", "Sunita Devi (Ward 3 & 4)", "ORS & Zinc Kits", 50, 0, 0, "Kits", "High", "Monsoon seasonal spike in dehydration cases anticipated.", "Submitted for review.", "PENDING", None),
+    ]
+    for r_id, a_name, m_name, req_q, app_q, disp_q, unit, urg, rsn, nts, st, disp_d in med_reqs:
+        cursor.execute("""
+        INSERT INTO medicine_requests (
+            request_id, asha_worker_name, medicine_name, requested_quantity,
+            approved_quantity, dispatched_quantity, unit, urgency, reason,
+            notes, status, dispatch_date, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """, (
+            r_id, a_name, m_name, req_q, app_q, disp_q, unit, urg, rsn, nts, st, disp_d, now_str, now_str
+        ))
+
     conn.commit()
     conn.close()
     return {"status": "success", "items_count": len(items_data)}

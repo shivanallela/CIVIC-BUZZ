@@ -1,6 +1,6 @@
 // ── Demo data constants ──────────────────────────────────────────────────────
 
-export type UserRole = "villager" | "panchayat_official" | "asha_worker";
+export type UserRole = "villager";
 
 export interface DemoVillager {
   id: string;
@@ -9,33 +9,9 @@ export interface DemoVillager {
   village: string;
 }
 
-export interface DemoPanchayat {
-  id: string;
-  name: string;
-  village: string;
-  role: "panchayat_official";
-}
+export type DemoSession = DemoVillager;
 
-export interface DemoAshaWorker {
-  id: string;
-  name: string;
-  village: string;
-  role: "asha_worker";
-  phcCenter: string;
-}
-
-export type DemoSession = DemoVillager | DemoPanchayat | DemoAshaWorker;
-
-// ── PanchayatStats ────────────────────────────────────────────────────────────
-
-export interface PanchayatStats {
-  total: number;
-  pending: number;
-  in_progress: number;
-  resolved: number;
-}
-
-// ── Complaint stub (Phase 2 will expand) ─────────────────────────────────────
+// ── Complaint stub ───────────────────────────────────────────────────────────
 
 export interface Complaint {
   id: string;

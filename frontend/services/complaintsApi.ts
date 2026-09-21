@@ -264,39 +264,63 @@ export async function fetchComplaintsApi(params?: {
   category?: string;
   search?: string;
 }): Promise<Complaint[]> {
-  let query = supabase
-    .from("complaints")
-    .select("*")
-    .order("created_at", { ascending: false });
+  // Try FastAPI backend first
+  try {
+    const urlParams = new URLSearchParams();
+    if (params?.village && params.village !== "ALL") urlParams.append("village", params.village);
+    if (params?.status && params.status !== "ALL") urlParams.append("status", params.status);
+    if (params?.category && params.category !== "ALL") urlParams.append("category", params.category);
+    if (params?.search) urlParams.append("q", params.search);
 
-  if (params?.village && params.village !== "ALL") {
-    query = query.eq("village", params.village);
-  }
-  if (params?.status && params.status !== "ALL") {
-    query = query.eq("status", params.status);
-  }
-  if (params?.category && params.category !== "ALL") {
-    query = query.eq("category", params.category);
-  }
-
-  const { data, error } = await query;
-  if (error) throw new Error(`Supabase fetch complaints error: ${error.message}`);
-
-  let results = (data || []).map(mapRow);
-
-  // Client-side search (Supabase free tier lacks full-text search)
-  if (params?.search) {
-    const s = params.search.toLowerCase();
-    results = results.filter(
-      (c) =>
-        (c.title || "").toLowerCase().includes(s) ||
-        (c.description || "").toLowerCase().includes(s) ||
-        (c.location || "").toLowerCase().includes(s) ||
-        (c.villager_name || "").toLowerCase().includes(s)
-    );
+    const qs = urlParams.toString();
+    const url = qs ? `${AI_BASE_URL}?${qs}` : `${AI_BASE_URL}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      return (data || []).map(mapRow);
+    }
+  } catch (e) {
+    console.warn("FastAPI backend complaints fetch unavailable, falling back to Supabase.", e);
   }
 
-  return results;
+  try {
+    let query = supabase
+      .from("complaints")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (params?.village && params.village !== "ALL") {
+      query = query.eq("village", params.village);
+    }
+    if (params?.status && params.status !== "ALL") {
+      query = query.eq("status", params.status);
+    }
+    if (params?.category && params.category !== "ALL") {
+      query = query.eq("category", params.category);
+    }
+
+    const { data, error } = await query;
+    if (error) throw new Error(`Supabase fetch complaints error: ${error.message}`);
+
+    let results = (data || []).map(mapRow);
+
+    // Client-side search (Supabase free tier lacks full-text search)
+    if (params?.search) {
+      const s = params.search.toLowerCase();
+      results = results.filter(
+        (c) =>
+          (c.title || "").toLowerCase().includes(s) ||
+          (c.description || "").toLowerCase().includes(s) ||
+          (c.location || "").toLowerCase().includes(s) ||
+          (c.villager_name || "").toLowerCase().includes(s)
+      );
+    }
+
+    return results;
+  } catch (err) {
+    console.warn("Supabase fetch complaints failed:", err);
+    return [];
+  }
 }
 
 /**
@@ -320,6 +344,8 @@ export async function createComplaintApi(
       ? "Electricity Board Emergency Rapid Action Wing (TSSPDCL / DISCOM - Call 1912)"
       : complaintData.category === "Water Supply"
       ? "Water Supply & Sanitation Board"
+      : complaintData.category === "Sanitation"
+      ? "Sanitation & Public Health Wing"
       : complaintData.category === "Electricity"
       ? "Electrical & Street Lighting Dept"
       : "Roads & Infrastructure Department"
@@ -472,25 +498,70 @@ export async function updateComplaintStatusApi(
   complaintId: string,
   newStatus: "pending" | "in_progress" | "resolved"
 ): Promise<Complaint | null> {
-  const { data, error } = await supabase
-    .from("complaints")
-    .update({ status: newStatus, updated_at: new Date().toISOString() })
-    .eq("complaint_id_code", complaintId)
-    .select();
+  // Try FastAPI backend first
+  try {
+    const res = await fetch(`${AI_BASE_URL}/${encodeURIComponent(complaintId)}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return mapRow(data);
+    }
+  } catch (err) {
+    console.warn("FastAPI backend updateComplaintStatus failed, trying Supabase.", err);
+  }
 
-  if (error) throw new Error(`Supabase update complaint error: ${error.message}`);
-  if (!data || !data[0]) return null;
+  try {
+    const { data, error } = await supabase
+      .from("complaints")
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .eq("complaint_id_code", complaintId)
+      .select();
 
-  return mapRow(data[0]);
+    if (error) throw new Error(`Supabase update complaint error: ${error.message}`);
+    if (!data || !data[0]) return null;
+
+    return mapRow(data[0]);
+  } catch (err) {
+    console.warn("Supabase updateComplaintStatus failed:", err);
+    return null;
+  }
 }
 
 /**
  * Fetch KPI counts for Gram Panchayat Dashboard directly from Supabase.
  */
 export async function fetchComplaintKPIsApi(): Promise<ComplaintKPIs> {
-  const { data, error } = await supabase.from("complaints").select("*");
-  if (error) {
-    console.error("Supabase KPI fetch error:", error.message);
+  try {
+    const list = await fetchComplaintsApi();
+    const total = list.length;
+    const pending = list.filter((c) => c.status === "pending").length;
+    const in_progress = list.filter((c) => c.status === "in_progress").length;
+    const resolved = list.filter((c) => c.status === "resolved").length;
+    const high_urgency = list.filter(
+      (c) => c.urgency === "High" && c.status !== "resolved"
+    ).length;
+
+    const category_breakdown: Record<string, number> = {};
+    for (const c of list) {
+      const cat = c.category || "Other";
+      category_breakdown[cat] = (category_breakdown[cat] || 0) + 1;
+    }
+
+    return {
+      total,
+      pending,
+      in_progress,
+      resolved,
+      high_urgency,
+      resolution_rate:
+        total > 0 ? `${((resolved / total) * 100).toFixed(1)}%` : "0%",
+      category_breakdown,
+    };
+  } catch (err) {
+    console.warn("fetchComplaintKPIsApi failed:", err);
     return {
       total: 0,
       pending: 0,
@@ -501,32 +572,6 @@ export async function fetchComplaintKPIsApi(): Promise<ComplaintKPIs> {
       category_breakdown: {},
     };
   }
-
-  const list = data || [];
-  const total = list.length;
-  const pending = list.filter((c) => c.status === "pending").length;
-  const in_progress = list.filter((c) => c.status === "in_progress").length;
-  const resolved = list.filter((c) => c.status === "resolved").length;
-  const high_urgency = list.filter(
-    (c) => c.urgency === "High" && c.status !== "resolved"
-  ).length;
-
-  const category_breakdown: Record<string, number> = {};
-  for (const c of list) {
-    const cat = c.category || "Other";
-    category_breakdown[cat] = (category_breakdown[cat] || 0) + 1;
-  }
-
-  return {
-    total,
-    pending,
-    in_progress,
-    resolved,
-    high_urgency,
-    resolution_rate:
-      total > 0 ? `${((resolved / total) * 100).toFixed(1)}%` : "0%",
-    category_breakdown,
-  };
 }
 
 /**
