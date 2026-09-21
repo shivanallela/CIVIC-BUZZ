@@ -15,8 +15,8 @@ load_dotenv()
 # ── App ──────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
-    title="Civic Catalyst Citizen API",
-    description="AI-assisted civic issue reporting & citizen engagement platform.",
+    title="Civic Buzz Citizen API",
+    description="AI-assisted civic issue reporting & citizen engagement platform.\n\nGitHub Repository: https://github.com/shivanallela/CIVIC-BUZZ",
     version="0.1.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -57,7 +57,7 @@ async def health_check():
     """Service health check endpoint."""
     return HealthResponse(
         status="ok",
-        service="Civic Catalyst Citizen API",
+        service="Civic Buzz Citizen API",
         version="0.1.0",
     )
 
@@ -65,7 +65,8 @@ async def health_check():
 @app.get("/", tags=["system"])
 async def root():
     return {
-        "message": "Civic Catalyst Citizen API is running.",
+        "message": "Civic Buzz Citizen API is running.",
         "docs": "/api/docs",
+        "repository": "https://github.com/shivanallela/CIVIC-BUZZ",
         "version": "0.1.0",
     }
