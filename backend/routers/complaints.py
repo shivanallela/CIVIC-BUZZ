@@ -91,7 +91,29 @@ class ComplaintAnalysisResponse(BaseModel):
     factors_breakdown: Dict[str, Any]
 
 
+class AssignRequest(BaseModel):
+    employee_id: str
+    department: Optional[str] = None
+    admin_notes: Optional[str] = None
+    override_reason: Optional[str] = None
+    admin_name: Optional[str] = "Panchayat Secretary"
+
+
+class TaskUpdateRequest(BaseModel):
+    employee_id: str
+    status: str
+    notes: Optional[str] = None
+    resolution_image_url: Optional[str] = None
+
+
+class VerifyRequest(BaseModel):
+    approved: bool
+    admin_notes: Optional[str] = None
+    admin_name: Optional[str] = "Panchayat Secretary"
+
+
 # ── Endpoints ────────────────────────────────────────────────────────────────
+
 
 @router.get("", response_model=List[Dict[str, Any]])
 async def list_complaints(
@@ -224,6 +246,117 @@ async def override_complaint_priority_endpoint(complaint_id: str, req: PriorityO
         "success": True,
         "message": "Panchayat priority override saved with audit trail",
         "complaint": updated,
+    }
+
+
+# ── Multi-Role Lifecycle Endpoints ──────────────────────────────────────────
+
+@router.get("/employees")
+async def list_employees():
+    """Retrieve list of civic field employees with workload and availability."""
+    return db_complaints.get_employees()
+
+
+@router.get("/recommendations/{complaint_id}")
+async def get_complaint_employee_recommendations(complaint_id: str):
+    """
+    AI Assistance Layer: Evaluates and ranks eligible field employees for a complaint
+    based on skill, jurisdiction, current workload, distance, and availability.
+    """
+    recommendations = db_complaints.get_employee_recommendations(complaint_id)
+    return {
+        "success": True,
+        "complaint_id": complaint_id,
+        "recommendations": recommendations,
+    }
+
+
+@router.post("/{complaint_id}/assign")
+async def assign_complaint_endpoint(complaint_id: str, req: AssignRequest):
+    """
+    Human-in-the-Loop: Admin reviews AI recommendation and officially assigns
+    the complaint to an employee with optional override reason.
+    """
+    updated = db_complaints.assign_complaint(
+        complaint_id=complaint_id,
+        employee_id=req.employee_id,
+        department=req.department,
+        admin_notes=req.admin_notes,
+        override_reason=req.override_reason,
+        admin_name=req.admin_name or "Panchayat Secretary",
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+    return {
+        "success": True,
+        "message": f"Task assigned to {updated.get('assigned_employee_name')}",
+        "complaint": updated,
+    }
+
+
+@router.post("/{complaint_id}/update-task")
+async def update_task_endpoint(complaint_id: str, req: TaskUpdateRequest):
+    """
+    Employee Field Action: Start work, add notes, or upload evidence and submit for verification.
+    """
+    updated = db_complaints.update_task_progress(
+        complaint_id=complaint_id,
+        employee_id=req.employee_id,
+        status=req.status,
+        notes=req.notes,
+        resolution_image_url=req.resolution_image_url,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+    return {
+        "success": True,
+        "message": f"Task status updated to {req.status}",
+        "complaint": updated,
+    }
+
+
+@router.post("/{complaint_id}/verify")
+async def verify_resolution_endpoint(complaint_id: str, req: VerifyRequest):
+    """
+    Admin Verification: Inspect before/after evidence and approve or request rework.
+    """
+    updated = db_complaints.verify_resolution(
+        complaint_id=complaint_id,
+        approved=req.approved,
+        admin_notes=req.admin_notes,
+        admin_name=req.admin_name or "Panchayat Secretary",
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+    return {
+        "success": True,
+        "message": "Resolution approved and marked resolved" if req.approved else "Rework requested from field team",
+        "complaint": updated,
+    }
+
+
+@router.get("/employee/{employee_id}/tasks")
+async def list_employee_tasks(employee_id: str):
+    """
+    Employee Portal: List tasks assigned to a specific field employee.
+    """
+    tasks = db_complaints.get_employee_tasks(employee_id)
+    return {
+        "success": True,
+        "employee_id": employee_id,
+        "tasks": tasks,
+    }
+
+
+@router.get("/audit-log")
+async def get_system_audit_log(complaint_id: Optional[str] = Query(None)):
+    """
+    Retrieve audit trail of all civic actions, assignments, overrides, and verifications.
+    """
+    logs = db_complaints.get_audit_logs(complaint_id=complaint_id)
+    return {
+        "success": True,
+        "audit_logs": logs,
     }
 
 

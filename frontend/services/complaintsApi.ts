@@ -61,7 +61,7 @@ export interface Complaint {
   category: string;
   location: string;
   urgency: "High" | "Medium" | "Low" | string;
-  status: "pending" | "in_progress" | "resolved";
+  status: "pending" | "in_progress" | "resolved" | "assigned" | "resolution_submitted" | string;
   villager_name: string;
   villager_id?: string;
   village?: string;
@@ -101,6 +101,28 @@ export interface Complaint {
   human_override_at?: string;
   human_override_department?: string;
   human_override_sla_hours?: number;
+
+  // Multi-Role Assignment & Lifecycle Fields
+  assigned_department?: string;
+  assigned_employee_id?: string;
+  assigned_employee_name?: string;
+  assigned_at?: string;
+  started_at?: string;
+  resolved_at?: string;
+  verified_at?: string;
+  resolution_notes?: string;
+  resolution_image_url?: string;
+  admin_notes?: string;
+  activity_history?: Array<{
+    event: string;
+    timestamp: string;
+    actor: string;
+    notes?: string;
+    details?: any;
+  }>;
+  ai_recommended_employee_id?: string;
+  ai_recommended_employee_name?: string;
+  ai_recommendation_reason?: string;
 }
 
 export interface ComplaintKPIs {
@@ -252,6 +274,26 @@ function mapRow(c: any): Complaint {
     human_override_at: c.human_override_at,
     human_override_department: c.human_override_department,
     human_override_sla_hours: c.human_override_sla_hours ? Number(c.human_override_sla_hours) : undefined,
+
+    // Lifecycle mappings
+    assigned_department: c.assigned_department,
+    assigned_employee_id: c.assigned_employee_id,
+    assigned_employee_name: c.assigned_employee_name,
+    assigned_at: c.assigned_at,
+    started_at: c.started_at,
+    resolved_at: c.resolved_at,
+    verified_at: c.verified_at,
+    resolution_notes: c.resolution_notes,
+    resolution_image_url: c.resolution_image_url,
+    admin_notes: c.admin_notes,
+    activity_history: Array.isArray(c.activity_history)
+      ? c.activity_history
+      : typeof c.activity_history === "string"
+      ? JSON.parse(c.activity_history || "[]")
+      : [],
+    ai_recommended_employee_id: c.ai_recommended_employee_id,
+    ai_recommended_employee_name: c.ai_recommended_employee_name,
+    ai_recommendation_reason: c.ai_recommendation_reason,
   };
 }
 
@@ -861,3 +903,115 @@ export async function fetchPriorityAnalyticsApi(): Promise<PriorityAnalytics> {
     },
   };
 }
+
+// ── Multi-Role Lifecycle API Endpoints ──────────────────────────────────────
+
+export async function fetchEmployeesApi(): Promise<any[]> {
+  try {
+    const res = await fetch(`${AI_BASE_URL}/employees`);
+    if (res.ok) return await res.json();
+  } catch (err) {
+    console.warn("Backend employees endpoint offline", err);
+  }
+  return [];
+}
+
+export async function fetchEmployeeRecommendationsApi(complaintId: string): Promise<any> {
+  const res = await fetch(`${AI_BASE_URL}/recommendations/${complaintId}`);
+  if (!res.ok) throw new Error("Failed to fetch employee recommendations");
+  return await res.json();
+}
+
+export async function assignComplaintApi(
+  complaintId: string,
+  payload: {
+    employee_id: string;
+    department?: string;
+    admin_notes?: string;
+    override_reason?: string;
+    admin_name?: string;
+  }
+): Promise<any> {
+  const res = await fetch(`${AI_BASE_URL}/${complaintId}/assign`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Failed to assign complaint" }));
+    throw new Error(err.detail || "Failed to assign complaint");
+  }
+  return await res.json();
+}
+
+export async function updateTaskProgressApi(
+  complaintId: string,
+  payload: {
+    employee_id: string;
+    status: string;
+    notes?: string;
+    resolution_image_url?: string;
+  }
+): Promise<any> {
+  const res = await fetch(`${AI_BASE_URL}/${complaintId}/update-task`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Failed to update task progress" }));
+    throw new Error(err.detail || "Failed to update task progress");
+  }
+  return await res.json();
+}
+
+export async function verifyResolutionApi(
+  complaintId: string,
+  payload: {
+    approved: boolean;
+    admin_notes?: string;
+    admin_name?: string;
+  }
+): Promise<any> {
+  const res = await fetch(`${AI_BASE_URL}/${complaintId}/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Failed to verify resolution" }));
+    throw new Error(err.detail || "Failed to verify resolution");
+  }
+  return await res.json();
+}
+
+export async function fetchEmployeeTasksApi(employeeId: string): Promise<Complaint[]> {
+  try {
+    const res = await fetch(`${AI_BASE_URL}/employee/${employeeId}/tasks`);
+    if (res.ok) {
+      const data = await res.json();
+      const tasks = data.tasks || [];
+      return tasks.map(mapRow);
+    }
+  } catch (err) {
+    console.warn("Backend employee tasks endpoint offline", err);
+  }
+  return [];
+}
+
+export async function fetchAuditLogsApi(complaintId?: string): Promise<any[]> {
+  try {
+    const url = complaintId
+      ? `${AI_BASE_URL}/audit-log?complaint_id=${complaintId}`
+      : `${AI_BASE_URL}/audit-log`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      return data.audit_logs || [];
+    }
+  } catch (err) {
+    console.warn("Backend audit logs endpoint offline", err);
+  }
+  return [];
+}
+

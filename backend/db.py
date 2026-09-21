@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import json
 from datetime import datetime
 from typing import Dict, Any, List
 
@@ -282,10 +283,221 @@ def init_db():
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """, item)
 
+    # 9. Dynamic Schema Migration: Ensure all lifecycle columns exist on complaints
+    cursor.execute("PRAGMA table_info(complaints);")
+    existing_cols = {col["name"] for col in cursor.fetchall()}
+
+    lifecycle_columns = [
+        ("assigned_department", "TEXT"),
+        ("assigned_employee_id", "TEXT"),
+        ("assigned_employee_name", "TEXT"),
+        ("assigned_at", "TEXT"),
+        ("started_at", "TEXT"),
+        ("resolved_at", "TEXT"),
+        ("verified_at", "TEXT"),
+        ("resolution_notes", "TEXT"),
+        ("resolution_image_url", "TEXT"),
+        ("admin_notes", "TEXT"),
+        ("activity_history", "TEXT"),
+        ("citizen_edited_description", "TEXT"),
+        ("ai_recommended_employee_id", "TEXT"),
+        ("ai_recommended_employee_name", "TEXT"),
+        ("ai_recommendation_reason", "TEXT"),
+    ]
+
+    for col_name, col_type in lifecycle_columns:
+        if col_name not in existing_cols:
+            cursor.execute(f"ALTER TABLE complaints ADD COLUMN {col_name} {col_type};")
+
+    # 10. Employees Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS employees (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id_code TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        phone TEXT,
+        department TEXT NOT NULL,
+        role_title TEXT NOT NULL,
+        skills TEXT,
+        jurisdiction TEXT,
+        workload_percent INTEGER DEFAULT 40,
+        active_tasks INTEGER DEFAULT 0,
+        completed_today INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'Available',
+        current_location TEXT,
+        latitude REAL,
+        longitude REAL,
+        shift TEXT DEFAULT 'Morning (8AM - 4PM)',
+        avatar_bg TEXT,
+        created_at TEXT NOT NULL
+    );
+    """)
+
+    # Seed employees if empty
+    cursor.execute("SELECT COUNT(*) as cnt FROM employees;")
+    emp_row = cursor.fetchone()
+    if emp_row and emp_row["cnt"] == 0:
+        now_iso = datetime.now().isoformat()
+        sample_employees = [
+            (
+                "EMP-001",
+                "Ravi Kumar",
+                "employee@civic.gov.in",
+                "+91-9876543220",
+                "Roads & Infrastructure Department",
+                "Senior Field Engineer",
+                json.dumps(["Roads & Infrastructure", "Drainage", "Public Facilities"]),
+                "Wards 1, 2, 3, 4",
+                42,
+                2,
+                1,
+                "Available",
+                "Ward 2, Panchayat Sub-Station",
+                18.1250,
+                79.5840,
+                "Morning (8AM - 4PM)",
+                "bg-emerald-600",
+                now_iso,
+            ),
+            (
+                "EMP-002",
+                "Suresh Rao",
+                "suresh.rao@civic.gov.in",
+                "+91-9876543221",
+                "Roads & Infrastructure Department",
+                "Pavement & Asphalt Supervisor",
+                json.dumps(["Roads & Infrastructure"]),
+                "Wards 3, 4, 5",
+                61,
+                3,
+                0,
+                "On Field",
+                "Ward 4, West Road",
+                18.1320,
+                79.5910,
+                "Morning (8AM - 4PM)",
+                "bg-blue-600",
+                now_iso,
+            ),
+            (
+                "EMP-003",
+                "Arun Kumar",
+                "arun.kumar@civic.gov.in",
+                "+91-9876543222",
+                "Roads & Infrastructure Department",
+                "Junior Road Maintenance Tech",
+                json.dumps(["Roads & Infrastructure"]),
+                "Wards 1, 6",
+                38,
+                1,
+                2,
+                "Available",
+                "Central Depot",
+                18.1180,
+                79.5760,
+                "General (9AM - 5PM)",
+                "bg-amber-600",
+                now_iso,
+            ),
+            (
+                "EMP-004",
+                "Priya Sharma",
+                "priya.sharma@civic.gov.in",
+                "+91-9876543223",
+                "Water Supply & Sanitation Board",
+                "Pipeline Operations Specialist",
+                json.dumps(["Water Supply", "Drainage"]),
+                "All Village Wards",
+                30,
+                1,
+                1,
+                "Available",
+                "Water Works Pump Station",
+                18.1210,
+                79.5890,
+                "Morning (8AM - 4PM)",
+                "bg-cyan-600",
+                now_iso,
+            ),
+            (
+                "EMP-005",
+                "Manjunath Reddy",
+                "manjunath.reddy@civic.gov.in",
+                "+91-9876543224",
+                "Electrical & Street Lighting Dept",
+                "Senior DISCOM Lineman",
+                json.dumps(["Street Lighting", "Electricity-related Civic Issue"]),
+                "All Village Wards",
+                50,
+                2,
+                1,
+                "On Field",
+                "Electrical Substation",
+                18.1290,
+                79.5820,
+                "Rotational",
+                "bg-yellow-600",
+                now_iso,
+            ),
+            (
+                "EMP-006",
+                "Rajesh Varma",
+                "rajesh.varma@civic.gov.in",
+                "+91-9876543225",
+                "Sanitation & Waste Management",
+                "Chief Sanitary Inspector",
+                json.dumps(["Sanitation & Waste", "Sanitation", "Health & Other"]),
+                "Wards 1, 2, 3, 4, 5",
+                45,
+                2,
+                3,
+                "Available",
+                "Sanitation Depot",
+                18.1265,
+                79.5865,
+                "Morning (7AM - 3PM)",
+                "bg-teal-600",
+                now_iso,
+            ),
+        ]
+        for emp in sample_employees:
+            cursor.execute("""
+            INSERT INTO employees (
+                employee_id_code, name, email, phone, department, role_title,
+                skills, jurisdiction, workload_percent, active_tasks, completed_today,
+                status, current_location, latitude, longitude, shift, avatar_bg, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """, emp)
+
+    # 11. Audit Logs Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        complaint_id TEXT NOT NULL,
+        actor_name TEXT NOT NULL,
+        actor_role TEXT NOT NULL,
+        action TEXT NOT NULL,
+        details TEXT,
+        created_at TEXT NOT NULL
+    );
+    """)
+
+    # Seed initial audit log entries if empty
+    cursor.execute("SELECT COUNT(*) as cnt FROM audit_logs;")
+    audit_row = cursor.fetchone()
+    if audit_row and audit_row["cnt"] == 0:
+        now_iso = datetime.now().isoformat()
+        cursor.execute("""
+        INSERT INTO audit_logs (complaint_id, actor_name, actor_role, action, details, created_at)
+        VALUES (?, ?, ?, ?, ?, ?);
+        """, ("C-002", "Rajesh Sharma", "Admin", "ASSIGNMENT_APPROVED", "Assigned to Manjunath Reddy (Electricity Dept)", now_iso))
+
     conn.commit()
     conn.close()
 
 
 def row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
     return dict(row) if row else {}
+
 

@@ -12,11 +12,17 @@ export default function LandingPage() {
   const router = useRouter();
   const [checked, setChecked] = useState(false);
 
-  // If a session exists, route straight to citizen dashboard
+  // If a session exists, route straight to its role dashboard
   useEffect(() => {
     const s = getSession();
     if (s) {
-      router.replace("/citizen/dashboard");
+      if (s.role === "employee") {
+        router.replace("/employee/dashboard");
+      } else if (s.role === "admin") {
+        router.replace("/admin/dashboard");
+      } else {
+        router.replace("/citizen/dashboard");
+      }
     } else {
       setChecked(true);
     }
@@ -33,7 +39,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-slate-50/60 flex flex-col">
       {/* ── Top bar ─────────────────────────────────────────────────────────── */}
-      <header className="w-full px-4 py-4 flex items-center justify-between max-w-3xl mx-auto">
+      <header className="w-full px-4 py-4 flex items-center justify-between max-w-4xl mx-auto">
         <div className="flex items-center gap-2.5">
           <CivicLogo size="sm" />
           <span className="font-extrabold text-emerald-950 text-lg tracking-tight">
@@ -44,13 +50,13 @@ export default function LandingPage() {
           <LanguageSelector variant="landing" />
           <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-900 border border-emerald-300 inline-flex items-center gap-1.5 shadow-2xs">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-            Citizen Portal
+            Citizen · Field · Admin
           </span>
         </div>
       </header>
 
       {/* ── Hero & Login ────────────────────────────────────────────────────── */}
-      <main className="flex-1 flex flex-col max-w-3xl mx-auto w-full px-4 pb-12">
+      <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4 pb-12">
         {/* Hero section */}
         <section className="pt-6 pb-6 text-center">
           <div className="flex justify-center mb-4">
@@ -61,10 +67,10 @@ export default function LandingPage() {
             Civic Catalyst
           </h1>
           <p className="text-base sm:text-lg text-emerald-900 font-bold mb-2">
-            &ldquo;Empowering every citizen&apos;s voice into action.&rdquo;
+            &ldquo;AI assists. Evidence supports. Humans decide.&rdquo;
           </p>
-          <p className="text-slate-600 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
-            AI-powered Citizen Civic Issue Reporting Portal. Report village hazards with photo evidence and GPS, check local weather, and track mandi market prices.
+          <p className="text-slate-600 text-xs sm:text-sm max-w-xl mx-auto leading-relaxed">
+            Unified multi-role civic management platform. Empowering citizens to report village hazards with AI vision, enabling field teams with GPS dispatch & photo verification, and assisting panchayat admins with intelligent triage.
           </p>
         </section>
 

@@ -205,7 +205,8 @@ def calculate_priority_score(
     dept, dept_conf = recommend_department(cat, text_desc)
 
     # Confidence calculation
-    ai_vision_conf = float(ai_observations.get("confidence", 0.92))
+    raw_conf = ai_observations.get("confidence")
+    ai_vision_conf = float(raw_conf) if raw_conf is not None else 0.92
     overall_confidence = round((ai_vision_conf * 0.5) + (dept_conf * 0.5), 2)
     needs_human_review = ai_vision_conf < 0.75 or overall_confidence < 0.75 or priority_tier == "CRITICAL"
 

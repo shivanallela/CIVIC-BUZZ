@@ -56,6 +56,7 @@ import {
   Globe,
   Megaphone,
   Flame,
+  Check,
 } from "lucide-react";
 import {
   analyzeIssueImage,
@@ -123,6 +124,7 @@ export default function CitizenDashboard() {
   const [currentTab, setCurrentTab] = useState("home");
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [submittingComplaint, setSubmittingComplaint] = useState(false);
+  const [selectedDetailComplaint, setSelectedDetailComplaint] = useState<Complaint | null>(null);
 
   // New Complaint Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -826,7 +828,21 @@ export default function CitizenDashboard() {
                       const tierBorder = pTier === "CRITICAL" ? "#fecaca" : pTier === "HIGH" ? "#ffedd5" : pTier === "MEDIUM" ? "#fef3c7" : "#bbf7d0";
 
                       return (
-                        <div key={c.id} className="complaint-item" style={{ padding: "1.1rem 1.25rem", display: "flex", alignItems: "flex-start", gap: "1rem", borderBottom: "1px solid #f1f5f9", background: isFireOrShock ? "#fffbfb" : "transparent" }}>
+                        <div
+                          key={c.id}
+                          className="complaint-item"
+                          onClick={() => setSelectedDetailComplaint(c)}
+                          style={{
+                            padding: "1.1rem 1.25rem",
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: "1rem",
+                            borderBottom: "1px solid #f1f5f9",
+                            background: isFireOrShock ? "#fffbfb" : "transparent",
+                            cursor: "pointer",
+                            transition: "background 0.15s ease",
+                          }}
+                        >
                           {c.imageUrl ? (
                             <img src={c.imageUrl} alt={c.title} style={{ width: 56, height: 56, borderRadius: 12, objectFit: "cover", border: isFireOrShock ? "2px solid #ef4444" : "1px solid #a7f3d0", flexShrink: 0 }} />
                           ) : (
@@ -1440,6 +1456,177 @@ export default function CitizenDashboard() {
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: COMPLAINT LIFECYCLE TRACKER ────────────────────────────── */}
+      {selectedDetailComplaint && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full border border-slate-200 shadow-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto animate-scaleUp">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200">
+                    {selectedDetailComplaint.complaint_id_code || selectedDetailComplaint.id}
+                  </span>
+                  <span
+                    className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+                      selectedDetailComplaint.priority_tier === "CRITICAL"
+                        ? "bg-rose-100 text-rose-900 border-rose-200"
+                        : "bg-blue-100 text-blue-900 border-blue-200"
+                    }`}
+                  >
+                    {selectedDetailComplaint.priority_tier || selectedDetailComplaint.urgency}
+                  </span>
+                </div>
+                <h3 className="text-lg font-black text-slate-900 mt-1">
+                  {selectedDetailComplaint.title}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  📍 {selectedDetailComplaint.location} · {selectedDetailComplaint.date}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setSelectedDetailComplaint(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Lifecycle Progress Stepper */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+              <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-3">
+                Resolution Progress Timeline
+              </p>
+
+              {(() => {
+                const s = selectedDetailComplaint.status;
+                const hasResolutionProof = Boolean(selectedDetailComplaint.resolution_image_url);
+                const isResolved = s === "resolved";
+                const isAwaiting = s === "resolution_submitted" || (s === "in_progress" && hasResolutionProof);
+                const isInProgress = s === "in_progress" || isAwaiting || isResolved;
+                const isAssigned = Boolean(selectedDetailComplaint.assigned_employee_name) || isInProgress;
+
+                const steps = [
+                  { label: "Reported", done: true, desc: "Submitted by citizen" },
+                  { label: "AI Triaged", done: true, desc: `${selectedDetailComplaint.category || "General"}` },
+                  {
+                    label: "Assigned",
+                    done: isAssigned,
+                    desc: selectedDetailComplaint.assigned_employee_name
+                      ? `To ${selectedDetailComplaint.assigned_employee_name}`
+                      : "Pending assignment",
+                  },
+                  { label: "On-Site Work", done: isInProgress, desc: "Engineer in action" },
+                  { label: "Verified & Resolved", done: isResolved, desc: isResolved ? "Audit confirmed" : isAwaiting ? "Awaiting audit" : "Pending completion" },
+                ];
+
+                return (
+                  <div className="space-y-3">
+                    {steps.map((step, idx) => (
+                      <div key={idx} className="flex items-start gap-3">
+                        <div
+                          className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
+                            step.done
+                              ? "bg-emerald-600 text-white shadow-xs"
+                              : "bg-slate-200 text-slate-400"
+                          }`}
+                        >
+                          {step.done ? <Check className="h-3.5 w-3.5" /> : idx + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className={`text-xs font-bold leading-tight ${
+                              step.done ? "text-slate-900" : "text-slate-400"
+                            }`}
+                          >
+                            {step.label}
+                          </p>
+                          <p className="text-[11px] text-slate-500">{step.desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Before / After Evidence Photos (if resolution submitted) */}
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Photo Evidence:
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-500">Reported Photo:</span>
+                  {selectedDetailComplaint.imageUrl ? (
+                    <img
+                      src={selectedDetailComplaint.imageUrl}
+                      alt="Reported"
+                      className="h-32 w-full object-cover rounded-xl border border-slate-200"
+                    />
+                  ) : (
+                    <div className="h-32 bg-slate-100 rounded-xl flex items-center justify-center text-xs text-slate-400">
+                      No Photo
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-emerald-800">
+                    Resolution Proof:
+                  </span>
+                  {selectedDetailComplaint.resolution_image_url ? (
+                    <img
+                      src={selectedDetailComplaint.resolution_image_url}
+                      alt="Resolved"
+                      className="h-32 w-full object-cover rounded-xl border border-emerald-400"
+                    />
+                  ) : (
+                    <div className="h-32 bg-amber-50/60 border border-dashed border-amber-300 rounded-xl flex items-center justify-center text-xs text-amber-800 p-2 text-center">
+                      Field work in progress
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Department & Staff Information */}
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-400 font-semibold">Handling Department:</span>
+                <span className="font-bold text-slate-900">
+                  {selectedDetailComplaint.assigned_department ||
+                    selectedDetailComplaint.recommended_department ||
+                    selectedDetailComplaint.category}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400 font-semibold">Field Engineer:</span>
+                <span className="font-bold text-slate-900">
+                  {selectedDetailComplaint.assigned_employee_name || "Assigned by Secretary"}
+                </span>
+              </div>
+              {selectedDetailComplaint.resolution_notes && (
+                <div className="pt-2 border-t border-slate-200">
+                  <span className="text-slate-400 font-semibold block mb-0.5">
+                    Repair Summary:
+                  </span>
+                  <p className="text-slate-800">{selectedDetailComplaint.resolution_notes}</p>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setSelectedDetailComplaint(null)}
+              className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer"
+            >
+              Close Details
+            </button>
           </div>
         </div>
       )}

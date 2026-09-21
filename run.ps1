@@ -1,6 +1,7 @@
 # Civic Catalyst - Quick Launch Script
 Write-Host "====================================================" -ForegroundColor Green
-Write-Host "Starting Civic Catalyst - Citizen Portal..." -ForegroundColor Cyan
+Write-Host "Starting Civic Catalyst - Unified Multi-Role Platform..." -ForegroundColor Cyan
+Write-Host "Citizen | Field Employee | Panchayat Admin" -ForegroundColor Cyan
 Write-Host "====================================================" -ForegroundColor Green
 
 Start-Process cmd -ArgumentList '/k', 'cd backend && python -m uvicorn main:app --reload --port 8000' -WindowStyle Normal
