@@ -1,5 +1,5 @@
 """
-Civic Catalyst — AI Civic Priority Intelligence Engine Test Suite
+Civic -Buzz — AI Civic Priority Intelligence Engine Test Suite
 Tests covering all 7 mandatory priority scoring & audit scenarios.
 """
 import pytest

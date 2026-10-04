@@ -1,5 +1,5 @@
 """
-Civic Catalyst — Supabase Medical Inventory & Database Manager
+Civic -Buzz — Supabase Medical Inventory & Database Manager
 All data reads/writes first target Supabase cloud.
 If Supabase is paused, offline, or unreachable, seamlessly falls back to local SQLite (inventory.db).
 """

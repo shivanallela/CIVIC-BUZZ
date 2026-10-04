@@ -1,5 +1,5 @@
 """
-Civic Catalyst — AI Civic Priority Intelligence Engine
+Civic -Buzz — AI Civic Priority Intelligence Engine
 Policy Engine for Deterministic 0-100 Priority Scoring, Department Recommendation,
 SLA Calculation, Duplicate Detection, & Explainable AI Decisions.
 """

@@ -1,6 +1,6 @@
-# Civic Catalyst - Quick Launch Script
+# Civic -Buzz - Quick Launch Script
 Write-Host "====================================================" -ForegroundColor Green
-Write-Host "Starting Civic Catalyst - Unified Multi-Role Platform..." -ForegroundColor Cyan
+Write-Host "Starting Civic -Buzz - Unified Multi-Role Platform..." -ForegroundColor Cyan
 Write-Host "Citizen | Field Employee | Panchayat Admin" -ForegroundColor Cyan
 Write-Host "====================================================" -ForegroundColor Green
 

@@ -101,7 +101,7 @@ export const DEMO_ADMIN: DemoAdmin = {
 
 // ── Authentication & Session Helpers ────────────────────────────────────────
 
-const RAW_API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+const RAW_API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://civic-buzz-backend.vercel.app").replace(/\/$/, "");
 
 export async function loginWithCredentialsAsync(
   identifier: string,

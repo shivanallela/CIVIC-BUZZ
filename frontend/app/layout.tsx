@@ -18,12 +18,12 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Civic Catalyst — AI-Powered Civic & Health Platform",
+  title: "Civic -Buzz — AI-Powered Civic & Health Platform",
   description:
-    "Civic Catalyst helps villagers report civic problems and connects them with the right Gram Panchayat & Health authorities using AI.",
+    "Civic -Buzz helps villagers report civic problems and connects them with the right Gram Panchayat & Health authorities using AI.",
   keywords: ["civic tech", "gram panchayat", "village complaints", "asha worker", "inventory", "AI", "india"],
   openGraph: {
-    title: "Civic Catalyst",
+    title: "Civic -Buzz",
     description: "Empowering rural India through smart civic & health management.",
     type: "website",
   },

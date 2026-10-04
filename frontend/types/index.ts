@@ -39,7 +39,7 @@ export interface EmployeeProfile {
   role_title: string;
   department: string;
   jurisdiction: string;
-  status: "AVAILABLE" | "BUSY" | "ON_DUTY" | "ON_LEAVE";
+  status: "AVAILABLE" | "BUSY" | "ON_DUTY" | "ON_LEAVE" | "ON_FIELD";
   current_tasks_count: number;
   phone?: string;
   email?: string;

@@ -1,5 +1,5 @@
 -- ══════════════════════════════════════════════════════════════════════════════
--- CIVIC CATALYST — SUPABASE POSTGRESQL COMPLETE DATABASE SCHEMA
+-- CIVIC -BUZZ — SUPABASE POSTGRESQL COMPLETE DATABASE SCHEMA
 -- Copy and paste this complete SQL script into Supabase SQL Editor:
 -- https://supabase.com/dashboard/project/vgxdpcowbuharsamwbra/sql/new
 -- ══════════════════════════════════════════════════════════════════════════════

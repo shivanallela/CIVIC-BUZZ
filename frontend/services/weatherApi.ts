@@ -1,5 +1,5 @@
 /**
- * Civic Catalyst — Live GPS Weather API Service
+ * Civic -Buzz — Live GPS Weather API Service
  * Fetches hyper-local real-time weather and 7-day agricultural forecasts using GPS coordinates.
  */
 

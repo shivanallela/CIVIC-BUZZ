@@ -228,7 +228,7 @@ export default function EmployeeDashboardPage() {
               <IndianNationalEmblem className="h-6 w-6 text-slate-700 hidden sm:inline-block" />
               <div>
                 <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight flex items-center gap-2">
-                  Civic Catalyst
+                  Civic -Buzz
                   <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
                     Field Operations
                   </span>

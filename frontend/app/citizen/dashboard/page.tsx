@@ -13,13 +13,10 @@ import type { DemoVillager } from "@/types";
 import { CivicLogo } from "@/components/CivicLogo";
 import IndianNationalEmblem from "@/components/IndianNationalEmblem";
 import {
-  LayoutDashboard,
   ClipboardList,
   CloudSun,
   TrendingUp,
-  FileText,
   LogOut,
-  Settings,
   HelpCircle,
   MessageSquare,
   Bell,
@@ -38,25 +35,17 @@ import {
   CheckCircle2,
   RefreshCw,
   AlertTriangle,
-  Trash2,
-  Image as ImageIcon,
-  Zap,
-  Wind,
-  Droplets,
   Clock,
-  Sun,
-  Compass,
   Navigation,
-  Thermometer,
-  Eye,
-  Umbrella,
-  Calendar,
-  CloudRain,
-  ShieldCheck,
-  Globe,
-  Megaphone,
+  Droplets,
   Flame,
   Check,
+  PhoneCall,
+  History,
+  FileCheck2,
+  ExternalLink,
+  Search,
+  Home,
 } from "lucide-react";
 import {
   analyzeIssueImage,
@@ -70,69 +59,36 @@ import { fetchLiveGpsWeather, type WeatherData } from "@/services/weatherApi";
 import { translations, type Language } from "@/lib/translations";
 import { LanguageSelector } from "@/components/LanguageSelector";
 
-const NAV_ITEMS = [
-  { id: "home", label: "Dashboard", icon: LayoutDashboard, badge: null },
-  { id: "complaints", label: "Complaints", icon: ClipboardList, badge: null },
-  { id: "weather", label: "Weather", icon: CloudSun, badge: "Live" },
-  { id: "market", label: "Market Prices", icon: TrendingUp, badge: "Live" },
-  { id: "news", label: "Local News", icon: FileText, badge: "New" },
-];
-
-const FEATURE_BOXES = [
-  {
-    id: "complaints",
-    title: "Civic Complaints",
-    desc: "Report problems in your village and track their resolution progress.",
-    icon: AlertCircle,
-    iconBg: "#fef2f2",
-    iconColor: "#ef4444",
-  },
-  {
-    id: "weather",
-    title: "Weather Report",
-    desc: "Check current weather, 7-day outlooks and farming advisories.",
-    icon: CloudSun,
-    iconBg: "#eff6ff",
-    iconColor: "#3b82f6",
-  },
-  {
-    id: "market",
-    title: "Market Prices",
-    desc: "View current crop rates across regional mandis for farmers.",
-    icon: TrendingUp,
-    iconBg: "#ecfdf5",
-    iconColor: "#059669",
-  },
-  {
-    id: "news",
-    title: "Local News",
-    desc: "Stay informed with official Gram Sabha notices and local alerts.",
-    icon: FileText,
-    iconBg: "#f5f3ff",
-    iconColor: "#8b5cf6",
-  },
-];
-
 function getInitials(name: string) {
-  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 }
 
 export default function CitizenDashboard() {
   const router = useRouter();
   const [session, setSession] = useState<DemoVillager | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currentTab, setCurrentTab] = useState("home");
+
+  // Redesigned Navigation Tabs matching Image 3 reference with Home option:
+  // "home" (Intro to Application), "report" (Report Issue), "track" (Track Issues), "history" (History), "help" (Help Desk)
+  const [currentTab, setCurrentTab] = useState<"home" | "report" | "track" | "history" | "help">("home");
   const [complaints, setComplaints] = useState<Complaint[]>([]);
-  const [submittingComplaint, setSubmittingComplaint] = useState(false);
+  const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedDetailComplaint, setSelectedDetailComplaint] = useState<Complaint | null>(null);
 
-  // New Complaint Modal State
+  // New Complaint Form State (Both in-tab and modal support)
   const [modalOpen, setModalOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newCategory, setNewCategory] = useState("Roads & Infrastructure");
   const [newLocation, setNewLocation] = useState("");
   const [urgencyLevel, setUrgencyLevel] = useState("High");
+  const [submittingComplaint, setSubmittingComplaint] = useState(false);
 
   // Image & AI Vision state
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -150,6 +106,18 @@ export default function CitizenDashboard() {
   const [activeBannerAnnc, setActiveBannerAnnc] = useState<any | null>(null);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
+  // Live GPS Weather State
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState<boolean>(true);
+  const [weatherLocationName, setWeatherLocationName] = useState<string>("Detecting GPS Location...");
+
+  // Language & Translation State
+  const [lang, setLang] = useState<Language>("en");
+
+  const t = (key: string): string => {
+    return translations[lang]?.[key] || translations["en"]?.[key] || key;
+  };
+
   const loadVillageAnnouncements = () => {
     try {
       const stored = localStorage.getItem("civic_village_announcements");
@@ -166,12 +134,13 @@ export default function CitizenDashboard() {
             title: "📢 National Pulse Polio & Health Drive Active Today!",
             category: "Public Health",
             location: "Ward 3 Primary Health Center & Door-to-Door",
-            message: "Special Pulse Polio booth is active today. All children aged 0-5 years must receive 2 oral polio drops.",
+            message:
+              "Special Pulse Polio booth is active today. All children aged 0-5 years must receive 2 oral polio drops.",
             priority: "Urgent",
             posted_by: "Village Public Health Administration",
             created_at: "Today, 08:30 AM",
             unread: true,
-          }
+          },
         ];
         localStorage.setItem("civic_village_announcements", JSON.stringify(defaultAnnc));
         setVillageAnnouncements(defaultAnnc);
@@ -182,31 +151,14 @@ export default function CitizenDashboard() {
     }
   };
 
-  useEffect(() => {
-    loadVillageAnnouncements();
-    const handleSync = () => loadVillageAnnouncements();
-    window.addEventListener("storage", handleSync);
-    window.addEventListener("village_announcement_posted", handleSync);
-    return () => {
-      window.removeEventListener("storage", handleSync);
-      window.removeEventListener("village_announcement_posted", handleSync);
-    };
-  }, []);
-
-  // Live GPS Weather State
-  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
-  const [weatherLoading, setWeatherLoading] = useState<boolean>(true);
-  const [weatherGpsCoords, setWeatherGpsCoords] = useState<{ lat: number; lon: number } | null>(null);
-  const [weatherLocationName, setWeatherLocationName] = useState<string>("Detecting GPS Location...");
-
   const loadWeatherForUser = async (overrideLat?: number, overrideLon?: number) => {
     setWeatherLoading(true);
     if (overrideLat && overrideLon) {
       try {
         const geoRes = await reverseGeocodeLocation(overrideLat, overrideLon);
-        const locName = geoRes.location || `GPS (${overrideLat.toFixed(3)}°N, ${overrideLon.toFixed(3)}°E)`;
+        const locName =
+          geoRes.location || `GPS (${overrideLat.toFixed(3)}°N, ${overrideLon.toFixed(3)}°E)`;
         setWeatherLocationName(locName);
-        setWeatherGpsCoords({ lat: overrideLat, lon: overrideLon });
         const w = await fetchLiveGpsWeather(overrideLat, overrideLon, locName);
         setWeatherData(w);
       } catch {
@@ -222,15 +174,19 @@ export default function CitizenDashboard() {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
           const { latitude, longitude } = pos.coords;
-          setWeatherGpsCoords({ lat: latitude, lon: longitude });
           try {
             const geoRes = await reverseGeocodeLocation(latitude, longitude);
-            const locName = geoRes.location || `GPS (${latitude.toFixed(3)}°N, ${longitude.toFixed(3)}°E)`;
+            const locName =
+              geoRes.location || `GPS (${latitude.toFixed(3)}°N, ${longitude.toFixed(3)}°E)`;
             setWeatherLocationName(locName);
             const w = await fetchLiveGpsWeather(latitude, longitude, locName);
             setWeatherData(w);
           } catch {
-            const w = await fetchLiveGpsWeather(latitude, longitude, `GPS (${latitude.toFixed(3)}°N, ${longitude.toFixed(3)}°E)`);
+            const w = await fetchLiveGpsWeather(
+              latitude,
+              longitude,
+              `GPS (${latitude.toFixed(3)}°N, ${longitude.toFixed(3)}°E)`
+            );
             setWeatherData(w);
           } finally {
             setWeatherLoading(false);
@@ -239,9 +195,10 @@ export default function CitizenDashboard() {
         async () => {
           const defaultLat = 17.9689;
           const defaultLon = 79.5941;
-          const defName = session?.village ? `${session.village} (GPS Standard)` : "Shyampet Village, Warangal";
+          const defName = session?.village
+            ? `${session.village} (GPS Standard)`
+            : "Shyampet Village, Warangal";
           setWeatherLocationName(defName);
-          setWeatherGpsCoords({ lat: defaultLat, lon: defaultLon });
           const w = await fetchLiveGpsWeather(defaultLat, defaultLon, defName);
           setWeatherData(w);
           setWeatherLoading(false);
@@ -251,7 +208,9 @@ export default function CitizenDashboard() {
     } else {
       const defaultLat = 17.9689;
       const defaultLon = 79.5941;
-      const defName = session?.village ? `${session.village} (GPS Standard)` : "Shyampet Village, Warangal";
+      const defName = session?.village
+        ? `${session.village} (GPS Standard)`
+        : "Shyampet Village, Warangal";
       setWeatherLocationName(defName);
       const w = await fetchLiveGpsWeather(defaultLat, defaultLon, defName);
       setWeatherData(w);
@@ -259,18 +218,13 @@ export default function CitizenDashboard() {
     }
   };
 
-  // Language & Translation State
-  const [lang, setLang] = useState<Language>("en");
-
-  const changeLanguage = (newLang: Language) => {
-    setLang(newLang);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("citizen_lang", newLang);
+  const loadLiveComplaints = async () => {
+    try {
+      const data = await fetchComplaintsApi();
+      setComplaints(data || []);
+    } catch (err) {
+      console.warn("Could not load live complaints:", err);
     }
-  };
-
-  const t = (key: string): string => {
-    return translations[lang]?.[key] || translations["en"]?.[key] || key;
   };
 
   useEffect(() => {
@@ -289,94 +243,95 @@ export default function CitizenDashboard() {
       }
     }
 
+    loadVillageAnnouncements();
     loadWeatherForUser();
     loadLiveComplaints();
-  }, [router]);
 
-  const loadLiveComplaints = async () => {
-    try {
-      const data = await fetchComplaintsApi();
-      setComplaints(data || []);
-    } catch (err) {
-      console.warn("Could not load live complaints:", err);
-    }
-  };
+    const handleSync = () => loadVillageAnnouncements();
+    window.addEventListener("storage", handleSync);
+    window.addEventListener("village_announcement_posted", handleSync);
+    return () => {
+      window.removeEventListener("storage", handleSync);
+      window.removeEventListener("village_announcement_posted", handleSync);
+    };
+  }, [router]);
 
   const handleLogout = () => {
     clearSession();
-    router.replace("/");
+    router.push("/");
   };
 
-  const processImageFile = async (file: File) => {
+  // ── AI Vision Image Analyzer ──────────────────────────────────
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
     setImageFile(file);
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const base64 = e.target?.result as string;
-      setImagePreview(base64);
+    setImagePreview(URL.createObjectURL(file));
+    setAnalyzingImage(true);
+    setAiAutofilled(false);
 
-      setAnalyzingImage(true);
-      try {
-        const res = await analyzeIssueImage(file, base64);
-        if (res && res.title) {
-          setNewTitle(res.title);
-          setNewDescription(res.description);
-          setNewCategory(res.category);
-          setUrgencyLevel(res.urgency || "High");
-          setAiModelName(res.ai_model);
-          setAiAutofilled(true);
+    try {
+      const analysis = await analyzeIssueImage(file);
+
+      if (analysis) {
+        if (analysis.title && (!newTitle || newTitle === "")) {
+          setNewTitle(analysis.title);
         }
-      } catch (err) {
-        console.error("AI Analysis error", err);
-      } finally {
-        setAnalyzingImage(false);
+        if (analysis.description) {
+          setNewDescription(analysis.description);
+        }
+        if (analysis.category) {
+          setNewCategory(analysis.category);
+        }
+        if (analysis.urgency) {
+          setUrgencyLevel(analysis.urgency);
+        }
+        setAiAutofilled(true);
+        setAiModelName(analysis.ai_model || "Groq AI (openai/gpt-oss-120b)");
       }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      processImageFile(e.target.files[0]);
+    } catch (err) {
+      console.warn("Image analysis failed:", err);
+    } finally {
+      setAnalyzingImage(false);
     }
   };
 
-  const handleDropImage = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      processImageFile(e.dataTransfer.files[0]);
+  // ── GPS Geolocation Auto-Detect ───────────────────────────────
+  const handleDetectLocation = () => {
+    if (!("geolocation" in navigator)) {
+      alert("Geolocation is not supported by your browser");
+      return;
     }
-  };
 
-  const handleDetectLocation = async () => {
     setDetectingLocation(true);
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          try {
-            const { latitude, longitude } = position.coords;
-            const res = await reverseGeocodeLocation(latitude, longitude);
-            setNewLocation(res.location || `Ward 4, Shyampet (GPS: ${latitude.toFixed(4)}°N, ${longitude.toFixed(4)}°E)`);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        try {
+          const res = await reverseGeocodeLocation(latitude, longitude);
+          if (res.success && res.location) {
+            setNewLocation(res.location);
             setLocationDetected(true);
-          } catch (err) {
-            setNewLocation(`Ward 4, Shyampet Village (GPS: ${position.coords.latitude.toFixed(4)}°N, ${position.coords.longitude.toFixed(4)}°E)`);
+          } else {
+            setNewLocation(`Ward 4, Shyampet (${latitude.toFixed(4)}°N, ${longitude.toFixed(4)}°E)`);
             setLocationDetected(true);
-          } finally {
-            setDetectingLocation(false);
           }
-        },
-        (error) => {
-          const fallbackLoc = `Ward 4, ${session?.village || "Shyampet"} Main Road (GPS Verified)`;
-          setNewLocation(fallbackLoc);
+        } catch {
+          setNewLocation(`Ward 4, Shyampet (${latitude.toFixed(4)}°N, ${longitude.toFixed(4)}°E)`);
           setLocationDetected(true);
+        } finally {
           setDetectingLocation(false);
-        },
-        { enableHighAccuracy: true, timeout: 8000 }
-      );
-    } else {
-      setNewLocation(`Ward 4, ${session?.village || "Shyampet"} Main Road`);
-      setLocationDetected(true);
-      setDetectingLocation(false);
-    }
+        }
+      },
+      (err) => {
+        console.warn("Geolocation error:", err);
+        setNewLocation("Ward 4, Shyampet Village, Warangal Rural");
+        setLocationDetected(true);
+        setDetectingLocation(false);
+      },
+      { timeout: 7000, enableHighAccuracy: true }
+    );
   };
 
   const resetFormState = () => {
@@ -387,37 +342,53 @@ export default function CitizenDashboard() {
     setUrgencyLevel("High");
     setImageFile(null);
     setImagePreview(null);
-    setAnalyzingImage(false);
     setAiAutofilled(false);
     setAiModelName("");
     setLocationDetected(false);
-    setDetectingLocation(false);
   };
 
-  const handleCreateComplaint = async (e: React.FormEvent) => {
+  // ── Submit Complaint ──────────────────────────────────────────
+  const handleSubmitComplaint = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim() || submittingComplaint) return;
+    if (!newTitle.trim()) return;
+
     setSubmittingComplaint(true);
     try {
+      const userLocation =
+        newLocation.trim() || (session?.village ? `${session.village}, Ward 4` : "Ward 4, Shyampet");
+      const citizenName = session?.name || "Ramesh Kumar";
+
+      let payloadImageUrl = imagePreview || "";
+      if (imageFile) {
+        payloadImageUrl = imagePreview || "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600";
+      }
+
+      const descText = (newTitle + " " + newDescription + " " + newCategory).toLowerCase();
+      const isFire = /(fire|flame|smoke|blaze|burn|explosion|gas leak|cylinder)/.test(descText) || newCategory.includes("Fire");
+      const isShock = /(shock|current|electrocution|live wire|spark|sparking|short circuit|high voltage)/.test(descText) || newCategory.includes("Electricity");
+
       const created = await createComplaintApi({
         title: newTitle,
-        description: newDescription || "Civic issue reported with photo and GPS location details.",
-        category: newCategory,
-        location: newLocation || `${session?.village || "Village"} Ward 1`,
-        urgency: urgencyLevel,
-        villager_name: session?.name || "Citizen",
-        villager_id: session?.id || "vil_001",
-        village: session?.village || "Shyampet",
-        imageUrl: imagePreview || undefined,
-        aiGenerated: aiAutofilled,
+        category: isFire
+          ? "Fire & Disaster Emergency"
+          : isShock
+          ? "Electricity-related Civic Issue"
+          : newCategory,
+        description: newDescription,
+        location: userLocation,
+        urgency: isFire || isShock ? "High" : urgencyLevel,
+        imageUrl: payloadImageUrl,
+        villager_name: citizenName,
+        villager_id: session?.id || "CITIZEN-001",
       });
 
-      setComplaints((prev) => [created, ...prev.filter((x) => x.id !== created.id)]);
+      setComplaints((prev) => [created, ...prev]);
       resetFormState();
       setModalOpen(false);
-      setCurrentTab("complaints");
+      setCurrentTab("track"); // Switch to Track tab to view newly filed ticket
     } catch (err) {
-      console.error("Failed to create complaint", err);
+      console.error("Failed to submit complaint:", err);
+      alert("Could not submit complaint. Please check connection and try again.");
     } finally {
       setSubmittingComplaint(false);
     }
@@ -425,893 +396,681 @@ export default function CitizenDashboard() {
 
   if (loading || !session) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#ffffff" }}>
-        <div className="loading-spinner" />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="animate-spin text-emerald-700" size={36} />
       </div>
     );
   }
 
-  const displayName = session.name;
+  const displayName = session.name || "Ramesh Kumar";
+
+  // Filtered complaints calculation
+  const filteredComplaints = complaints.filter((c) => {
+    const textMatch =
+      !searchQuery ||
+      (c.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.description || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.location || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.category || "").toLowerCase().includes(searchQuery.toLowerCase());
+
+    if (!textMatch) return false;
+
+    if (filterCategory === "all") return true;
+    if (filterCategory === "critical") {
+      const descText = ((c.title || "") + " " + (c.description || "") + " " + (c.category || "")).toLowerCase();
+      const isEmergency =
+        /(fire|flame|smoke|blaze|burn|shock|current|electrocution|live wire)/.test(descText) ||
+        (c.priority_tier || "").toUpperCase() === "CRITICAL" ||
+        (c.recommended_sla_hours !== undefined && c.recommended_sla_hours <= 0.5);
+      return isEmergency;
+    }
+    if (filterCategory === "in_progress") {
+      return c.status === "in_progress" || c.status === "resolution_submitted";
+    }
+    if (filterCategory === "resolved") {
+      return c.status === "resolved";
+    }
+    return (c.category || "").toLowerCase().includes(filterCategory.toLowerCase());
+  });
+
+  const resolvedComplaints = complaints.filter((c) => c.status === "resolved");
+  const activeComplaintsCount = complaints.filter((c) => c.status !== "resolved").length;
 
   return (
-    <div className="panchayat-shell">
+    <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans text-slate-900 selection:bg-emerald-100 selection:text-emerald-900">
+      {/* Background Indian National Emblem Watermark */}
+      <IndianNationalEmblem opacity={0.04} className="emblem-watermark pointer-events-none fixed inset-0 m-auto" />
 
-      {/* ── SIDEBAR ───────────────────────────────────────── */}
-      <aside className="panchayat-sidebar">
-        {/* Logo */}
-        <div className="sidebar-logo">
-          <CivicLogo size="sm" />
-          <div>
-            <div className="sidebar-logo-name">{t("citizenTitle")}</div>
-            <div className="sidebar-logo-version">{t("citizenSub")}</div>
-          </div>
-        </div>
-
-        {/* Nav */}
-        <p className="sidebar-section-label">Main Menu</p>
-        <nav className="sidebar-nav">
-          {NAV_ITEMS.map(({ id, icon: Icon, label, badge }) => {
-            const isActive = currentTab === id;
-            const liveBadge = id === "weather" ? (weatherData ? `${weatherData.temperature}°` : badge) : id === "complaints" ? String(complaints.length) : badge;
-            const labelText = id === "home" ? t("navCitizenHome") :
-                              id === "complaints" ? t("navCitizenComplaints") :
-                              id === "weather" ? t("navCitizenWeather") :
-                              id === "market" ? t("navCitizenMarket") :
-                              id === "news" ? t("navCitizenNews") : label;
-            return (
-              <button
-                key={id}
-                onClick={() => setCurrentTab(id)}
-                className={`sidebar-nav-item${isActive ? " active" : ""}`}
-                style={{ width: "100%", textAlign: "left", background: "transparent", cursor: "pointer" }}
-              >
-                <Icon className="sidebar-nav-icon" />
-                <span className="sidebar-nav-text">{labelText}</span>
-                {liveBadge && <span className="sidebar-nav-badge">{liveBadge}</span>}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Bottom */}
-        <div className="sidebar-bottom">
-          <button className="sidebar-bottom-item">
-            <Settings style={{ width: 16, height: 16 }} />
-            <span className="sidebar-nav-text">Settings</span>
-          </button>
-          <button className="sidebar-bottom-item">
-            <HelpCircle style={{ width: 16, height: 16 }} />
-            <span className="sidebar-nav-text">Support</span>
-          </button>
-          <button className="sidebar-bottom-item danger" onClick={handleLogout}>
-            <LogOut style={{ width: 16, height: 16 }} />
-            <span className="sidebar-nav-text">Log out</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* ── BODY ──────────────────────────────────────────── */}
-      <div className="panchayat-body">
-
-        {/* Top bar */}
-        <header className="panchayat-topbar">
-          <div className="topbar-right" style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            {/* Language Selector Dropdown (Google Translation) */}
-            <LanguageSelector onLanguageChange={(l) => setLang(l as Language)} />
-
-            <button className="topbar-icon-btn" title="Messages">
-              <MessageSquare style={{ width: 15, height: 15 }} />
-            </button>
-            <button
-              className="topbar-icon-btn"
-              title="Notifications & Village Announcements"
-              onClick={() => setShowNotifDropdown(!showNotifDropdown)}
-              style={{ position: "relative" }}
-            >
-              <Bell style={{ width: 15, height: 15 }} />
-              {villageAnnouncements.length > 0 && (
-                <span className="topbar-notif-dot">{villageAnnouncements.length}</span>
-              )}
-            </button>
-
-            {/* Notifications Bell Dropdown Popup */}
-            {showNotifDropdown && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "55px",
-                  right: "120px",
-                  width: "340px",
-                  background: "#ffffff",
-                  borderRadius: "14px",
-                  border: "1px solid #cbd5e1",
-                  boxShadow: "0 10px 30px rgba(0,0,0,0.18)",
-                  zIndex: 1000,
-                  padding: "1rem",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem", borderBottom: "1px solid #f1f5f9", paddingBottom: "0.5rem" }}>
-                  <div style={{ fontSize: "0.9rem", fontWeight: 800, color: "#0f172a", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                    <Bell size={16} style={{ color: "#0d9488" }} />
-                    Village Announcements
-                  </div>
-                  <button onClick={() => setShowNotifDropdown(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b" }}>
-                    <X size={16} />
-                  </button>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", maxHeight: "280px", overflowY: "auto" }}>
-                  {villageAnnouncements.length === 0 ? (
-                    <div style={{ fontSize: "0.78rem", color: "#64748b", textAlign: "center", padding: "1rem" }}>No active notifications</div>
-                  ) : (
-                    villageAnnouncements.map((annc) => (
-                      <div
-                        key={annc.id}
-                        onClick={() => {
-                          setActiveBannerAnnc(annc);
-                          setShowNotifDropdown(false);
-                        }}
-                        style={{
-                          padding: "0.65rem 0.75rem",
-                          borderRadius: "10px",
-                          background: annc.priority === "Urgent" ? "#f0fdfa" : "#f8fafc",
-                          border: annc.priority === "Urgent" ? "1px solid #99f6e4" : "1px solid #e2e8f0",
-                          cursor: "pointer",
-                        }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <span style={{ fontSize: "0.65rem", fontWeight: 800, color: "#0d9488" }}>{annc.category}</span>
-                          <span style={{ fontSize: "0.65rem", color: "#94a3b8" }}>{annc.created_at}</span>
-                        </div>
-                        <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#0f172a", marginTop: "0.15rem" }}>{annc.title}</div>
-                        <div style={{ fontSize: "0.72rem", color: "#475569", marginTop: "0.2rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {annc.message}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div className="topbar-profile">
-              <div className="topbar-avatar">{getInitials(displayName)}</div>
-              <div>
-                <div className="topbar-profile-name">{displayName}</div>
-                <div className="topbar-profile-role">{session.village} · Resident</div>
-              </div>
-              <ChevronDown style={{ width: 12, height: 12, color: "rgba(148,163,184,0.4)", marginLeft: "0.25rem" }} />
+      {/* ── TOPBAR NAVIGATION (Redesigned matching Image 3 Reference) ──── */}
+      <header className="civic-top-nav-bar">
+        <div className="civic-top-nav-inner">
+          {/* Brand Logo & Name */}
+          <div
+            className="civic-brand-wrap"
+            onClick={() => setCurrentTab("track")}
+            title="Civic Buzz Citizen Intelligence"
+          >
+            <CivicLogo size="md" />
+            <div>
+              <div className="civic-brand-title">Civic Buzz</div>
+              <div className="civic-brand-sub">Citizen Portal · {session.village || "Shyampet"}</div>
             </div>
           </div>
-        </header>
 
-        {/* Scrollable content */}
-        <div className="panchayat-content">
+          {/* Top Horizontal Navigation Links (Image 3 layout + Home) */}
+          <nav className="civic-nav-tabs">
+            <button
+              onClick={() => setCurrentTab("home")}
+              className={`civic-nav-tab ${currentTab === "home" ? "active" : ""}`}
+            >
+              <Home size={16} />
+              <span>Home</span>
+            </button>
 
-          {/* Watermark */}
-          <IndianNationalEmblem opacity={0.045} className="emblem-watermark" />
+            <button
+              onClick={() => setCurrentTab("report")}
+              className={`civic-nav-tab ${currentTab === "report" ? "active" : ""}`}
+            >
+              <Plus size={16} />
+              <span>Report Issue</span>
+            </button>
 
-          {/* Orbs */}
-          <div className="orb orb-1" style={{ opacity: 0.4 }} />
-          <div className="orb orb-2" style={{ opacity: 0.3 }} />
-
-          {/* ── HOME TAB (Compact Viewport Fit) ──────────────── */}
-          {currentTab === "home" && (
-            <div className="fade-up fade-up-1" style={{ maxWidth: 960, margin: "0 auto" }}>
-              
-              {/* Greetings */}
-              <div style={{ marginBottom: "0.85rem" }}>
-                <h1 className="greeting-title" style={{ fontSize: "1.5rem" }}>
-                  {t("welcomeBack")}, {displayName}
-                </h1>
-                <p className="greeting-sub" style={{ fontSize: "0.82rem", color: "#64748b", marginTop: "0.15rem" }}>
-                  {t("welcomeSub")}
-                </p>
-              </div>
-
-              {/* ── LIVE ASHA HEALTH ANNOUNCEMENT & ALERT BANNER ── */}
-              {activeBannerAnnc && (
-                <div
-                  style={{
-                    background: activeBannerAnnc.priority === "Urgent"
-                      ? "linear-gradient(135deg, #0d9488 0%, #0f766e 100%)"
-                      : "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)",
-                    color: "white",
-                    borderRadius: "16px",
-                    padding: "1.1rem 1.25rem",
-                    marginBottom: "1rem",
-                    boxShadow: "0 8px 24px rgba(13, 148, 136, 0.25)",
-                    position: "relative",
-                    border: "1px solid rgba(255,255,255,0.25)",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem", flexWrap: "wrap" }}>
-                        <span style={{ background: "#fef08a", color: "#854d0e", padding: "0.15rem 0.65rem", borderRadius: "999px", fontSize: "0.68rem", fontWeight: 900 }}>
-                          📢 LIVE VILLAGE ANNOUNCEMENT
-                        </span>
-                        <span style={{ background: "rgba(255,255,255,0.2)", padding: "0.15rem 0.55rem", borderRadius: "999px", fontSize: "0.68rem", fontWeight: 800 }}>
-                          📍 {activeBannerAnnc.location}
-                        </span>
-                        <span style={{ fontSize: "0.68rem", opacity: 0.85 }}>
-                          {activeBannerAnnc.created_at}
-                        </span>
-                      </div>
-
-                      <h3 style={{ fontSize: "1.15rem", fontWeight: 900, margin: "0 0 0.35rem 0" }}>
-                        {activeBannerAnnc.title}
-                      </h3>
-                      <p style={{ fontSize: "0.83rem", margin: 0, opacity: 0.95, lineHeight: 1.45 }}>
-                        {activeBannerAnnc.message}
-                      </p>
-                      <div style={{ fontSize: "0.72rem", opacity: 0.8, marginTop: "0.4rem", fontWeight: 700 }}>
-                        Posted by: {activeBannerAnnc.posted_by}
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => setActiveBannerAnnc(null)}
-                      style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "white", borderRadius: "8px", padding: "0.3rem 0.6rem", cursor: "pointer", fontSize: "0.72rem", fontWeight: 800 }}
-                    >
-                      Dismiss ✕
-                    </button>
-                  </div>
-                </div>
+            <button
+              onClick={() => setCurrentTab("track")}
+              className={`civic-nav-tab ${currentTab === "track" ? "active" : ""}`}
+            >
+              <ClipboardList size={16} />
+              <span>Track Issues</span>
+              {activeComplaintsCount > 0 && (
+                <span className="civic-nav-tab-badge">{activeComplaintsCount}</span>
               )}
+            </button>
 
-              {/* Live GPS Weather Widget */}
-              <div
-                onClick={() => setCurrentTab("weather")}
-                style={{
-                  background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)",
-                  borderRadius: 14,
-                  padding: "0.85rem 1.15rem",
-                  color: "white",
-                  marginBottom: "0.85rem",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                  gap: "0.75rem",
-                  cursor: "pointer",
-                  boxShadow: "0 4px 14px rgba(2,132,199,0.25)"
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                  <div style={{ fontSize: "1.8rem" }}>
-                    {weatherData ? (weatherData.weatherCode === 0 ? "☀️" : weatherData.weatherCode <= 3 ? "⛅" : "🌧️") : "🌤️"}
-                  </div>
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                      <span style={{ fontSize: "1.1rem", fontWeight: 900 }}>
-                        {weatherData ? `${weatherData.temperature}°C` : "31°C"}
-                      </span>
-                      <span style={{ fontSize: "0.78rem", opacity: 0.9 }}>
-                        {weatherData ? weatherData.conditionText : "Partly Cloudy"}
-                      </span>
-                      <span style={{ background: "rgba(255,255,255,0.2)", fontSize: "0.65rem", padding: "0.1rem 0.4rem", borderRadius: 999, fontWeight: 700 }}>
-                        📍 {t("liveGpsStation")}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: "0.72rem", opacity: 0.85, marginTop: "0.15rem" }}>
-                      {weatherLocationName} · Humidity: {weatherData?.humidity ?? 65}% · Wind: {weatherData?.windSpeed ?? 12} km/h
-                    </div>
-                  </div>
-                </div>
+            <button
+              onClick={() => setCurrentTab("history")}
+              className={`civic-nav-tab ${currentTab === "history" ? "active" : ""}`}
+            >
+              <History size={16} />
+              <span>History</span>
+              {resolvedComplaints.length > 0 && (
+                <span className="civic-nav-tab-badge">{resolvedComplaints.length}</span>
+              )}
+            </button>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.74rem", fontWeight: 800, background: "rgba(255,255,255,0.18)", padding: "0.35rem 0.75rem", borderRadius: 8 }}>
-                  <span>{t("navCitizenWeather")}</span>
-                  <ArrowRight size={13} />
-                </div>
+            <button
+              onClick={() => setCurrentTab("help")}
+              className={`civic-nav-tab ${currentTab === "help" ? "active" : ""}`}
+            >
+              <HelpCircle size={16} />
+              <span>Help Desk</span>
+            </button>
+          </nav>
+
+          {/* Right Action Tools & Profile */}
+          <div className="flex items-center gap-3">
+            {/* "Welcome Citizen" Profile Card */}
+            <div className="flex items-center gap-2.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-800 to-emerald-600 flex items-center justify-center text-xs font-extrabold text-white shadow-xs">
+                {getInitials(displayName)}
               </div>
-
-              {/* Hero Banner */}
-              <div className="featured-stat-card blue" style={{ minHeight: "auto", padding: "1.1rem 1.25rem", marginBottom: "0.85rem" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.65rem", fontWeight: 700, color: "#a7f3d0", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.35rem" }}>
-                  <Sparkles style={{ width: 12, height: 12 }} />
-                  {t("onePlatform")}
-                </div>
-                <h2 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#ffffff", margin: "0 0 0.3rem 0", lineHeight: 1.25 }}>
-                  {t("heroTitle")}
-                </h2>
-                <p style={{ fontSize: "0.8rem", color: "#a7f3d0", margin: 0, opacity: 0.95, maxWidth: 640, lineHeight: 1.45 }}>
-                  {t("heroSub")}
-                </p>
+              <div className="text-left">
+                <div className="text-xs font-black text-slate-900 leading-tight">Welcome, Citizen</div>
+                <div className="text-[11px] text-emerald-700 font-semibold">{displayName}</div>
               </div>
+            </div>
 
-              {/* Section Header */}
-              <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.5rem" }}>
-                {t("platformCapabilities")}
-              </div>
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-all cursor-pointer"
+              title="Logout from Civic Buzz"
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
+        </div>
+      </header>
 
-              {/* 4 Feature Boxes (2 in a row) */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.75rem", marginBottom: "0.85rem" }}>
-                {FEATURE_BOXES.map(({ id, title, desc, icon: Icon, iconBg, iconColor }) => (
-                  <div
-                    key={id}
-                    onClick={() => setCurrentTab(id)}
-                    style={{
-                      background: "#ffffff",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 14,
-                      padding: "1rem 1.125rem",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.borderColor = "#059669";
-                      e.currentTarget.style.boxShadow = "0 8px 24px rgba(5,150,105,0.12)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "none";
-                      e.currentTarget.style.borderColor = "#e2e8f0";
-                      e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.03)";
-                    }}
-                  >
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.65rem" }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 10, background: iconBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          <Icon style={{ width: 18, height: 18, color: iconColor }} />
-                        </div>
-                        <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "#059669", display: "flex", alignItems: "center", gap: "0.2rem" }}>
-                          Explore <ArrowRight style={{ width: 11, height: 11 }} />
-                        </span>
-                      </div>
-                      <div style={{ fontSize: "0.9rem", fontWeight: 800, color: "#0f172a", marginBottom: "0.25rem" }}>
-                        {title}
-                      </div>
-                      <div style={{ fontSize: "0.76rem", color: "#64748b", lineHeight: 1.45 }}>
-                        {desc}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+      {/* ── MAIN CONTENT WORKSPACE ────────────────────────────────────── */}
+      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10">
 
-              {/* One Platform Footer Card */}
-              <div className="glass-card" style={{ padding: "0.75rem 1.125rem", display: "flex", alignItems: "center", gap: "0.75rem", borderRadius: 12 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 9, background: "#ecfdf5", border: "1px solid #a7f3d0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <Sparkles style={{ width: 15, height: 15, color: "#059669" }} />
+        {/* ── TAB VIEWS (Each topic opens in its own independent clean interface) ── */}
+
+        {/* ── TAB 0: HOME (Welcome User, Platform Banner, Announcements & Intro) ── */}
+        {currentTab === "home" && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* 1. Welcome User Header */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+              <span className="text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                Citizen Portal &middot; {session.village || "Shyampet"}
+              </span>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1.5">
+                Welcome, {displayName}!
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Access digital village services, report civic problems, and track municipal actions.
+              </p>
+            </div>
+
+
+            {/* 3. AI-Powered Citizen Complaint Platform Hero Banner */}
+            <section className="civic-platform-banner">
+              <div className="flex items-center gap-4 flex-1">
+                <div className="civic-banner-icon-box">
+                  <Sparkles size={28} className="text-emerald-300" />
                 </div>
                 <div>
-                  <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#042d20" }}>One Digital Village Platform</div>
-                  <div style={{ fontSize: "0.73rem", color: "#64748b" }}>Everything important about your village in one simple place.</div>
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-200 border border-emerald-300/30">
+                      AI-Powered Citizen Platform
+                    </span>
+                    <span className="text-[11px] font-semibold text-emerald-200">
+                      📍 Ward 4, {session.village || "Shyampet"}
+                    </span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight m-0">
+                    AI-Powered Citizen Complaint Platform
+                  </h2>
+                  <p className="text-xs sm:text-sm text-emerald-100/90 mt-1 max-w-2xl leading-relaxed">
+                    Empowering rural &amp; civic communities with automated AI vision hazard classification, GPS
+                    geotagging, deterministic 0–100 priority intelligence, and 30-minute rapid emergency SLAs.
+                  </p>
                 </div>
               </div>
 
-            </div>
-          )}
+              {/* Quick Action Buttons inside Banner */}
+              <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+                <button
+                  onClick={() => setCurrentTab("report")}
+                  className="px-4 py-2.5 rounded-xl bg-white text-emerald-950 font-bold text-xs sm:text-sm hover:bg-emerald-50 transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus size={16} className="text-emerald-700" />
+                  <span>Report Issue</span>
+                </button>
 
-          {/* ── COMPLAINTS TAB ────────────────────────────────── */}
-          {currentTab === "complaints" && (
-            <div className="fade-up fade-up-2">
-              <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
-                  <div>
-                    <h2 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#042d20", margin: 0 }}>{t("navCitizenComplaints")}</h2>
-                    <p style={{ fontSize: "0.8rem", color: "#64748b", margin: "0.25rem 0 0 0" }}>{t("welcomeSub")}</p>
-                  </div>
-                  <button className="add-report-btn" onClick={() => setModalOpen(true)}>
-                    <Plus style={{ width: 15, height: 15 }} />
-                    {t("btnReportIssue")}
-                  </button>
-                </div>
-
-                <div className="complaints-card" style={{ border: "1px solid #e2e8f0" }}>
-                  {complaints.length === 0 ? (
-                    <div style={{ padding: "3rem 1.5rem", textAlign: "center", color: "#64748b" }}>
-                      <CheckCircle2 size={36} style={{ color: "#16a34a", margin: "0 auto 0.75rem" }} />
-                      <div style={{ fontSize: "1rem", fontWeight: 800, color: "#0f172a" }}>No civic complaints reported yet</div>
-                      <div style={{ fontSize: "0.8rem", marginTop: "0.25rem", marginBottom: "1rem" }}>
-                        Have an issue in your village? Use the button below to report it to Gram Panchayat.
-                      </div>
-                      <button className="add-report-btn" style={{ margin: "0 auto" }} onClick={() => setModalOpen(true)}>
-                        <Plus style={{ width: 15, height: 15 }} />
-                        {t("btnReportIssue")}
-                      </button>
-                    </div>
-                  ) : (
-                    complaints.map((c) => {
-                      const descText = ((c.title || "") + " " + (c.description || "") + " " + (c.category || "")).toLowerCase();
-                      const isFireOrShock = /(fire|flame|smoke|blaze|burn|explosion|shock|current|electrocution|live wire|spark|short circuit)/.test(descText) || (c.recommended_sla_hours !== undefined && c.recommended_sla_hours <= 0.5);
-
-                      const pScore = c.priority_score ?? (isFireOrShock ? 100 : 50);
-                      const pTier = (c.priority_tier || (isFireOrShock ? "CRITICAL" : pScore >= 75 ? "CRITICAL" : pScore >= 50 ? "HIGH" : pScore >= 25 ? "MEDIUM" : "LOW")).toUpperCase();
-                      const tierColor = pTier === "CRITICAL" ? "#dc2626" : pTier === "HIGH" ? "#ea580c" : pTier === "MEDIUM" ? "#d97706" : "#16a34a";
-                      const tierBg = pTier === "CRITICAL" ? "#fef2f2" : pTier === "HIGH" ? "#fff7ed" : pTier === "MEDIUM" ? "#fffbeb" : "#f0fdf4";
-                      const tierBorder = pTier === "CRITICAL" ? "#fecaca" : pTier === "HIGH" ? "#ffedd5" : pTier === "MEDIUM" ? "#fef3c7" : "#bbf7d0";
-
-                      return (
-                        <div
-                          key={c.id}
-                          className="complaint-item"
-                          onClick={() => setSelectedDetailComplaint(c)}
-                          style={{
-                            padding: "1.1rem 1.25rem",
-                            display: "flex",
-                            alignItems: "flex-start",
-                            gap: "1rem",
-                            borderBottom: "1px solid #f1f5f9",
-                            background: isFireOrShock ? "#fffbfb" : "transparent",
-                            cursor: "pointer",
-                            transition: "background 0.15s ease",
-                          }}
-                        >
-                          {c.imageUrl ? (
-                            <img src={c.imageUrl} alt={c.title} style={{ width: 56, height: 56, borderRadius: 12, objectFit: "cover", border: isFireOrShock ? "2px solid #ef4444" : "1px solid #a7f3d0", flexShrink: 0 }} />
-                          ) : (
-                            <div className="complaint-avatar" style={{ background: isFireOrShock ? "#dc2626" : c.avatarBg || "#064e3b", width: 48, height: 48, borderRadius: 12, fontSize: "0.85rem", flexShrink: 0 }}>
-                              {isFireOrShock ? "🚨" : c.id}
-                            </div>
-                          )}
-                          <div className="complaint-info" style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.25rem" }}>
-                              <span className="complaint-title" style={{ fontSize: "0.95rem", fontWeight: 800 }}>{c.title}</span>
-                              <span style={{ fontSize: "0.68rem", fontWeight: 900, color: tierColor, background: tierBg, border: `1px solid ${tierBorder}`, padding: "0.15rem 0.5rem", borderRadius: 999 }}>
-                                {pTier} · {pScore}/100 Score
-                              </span>
-                              <span style={{ fontSize: "0.68rem", fontWeight: 800, color: isFireOrShock ? "#b91c1c" : "#0284c7", background: isFireOrShock ? "#fee2e2" : "#f0f9ff", border: `1px solid ${isFireOrShock ? "#fca5a5" : "#bae6fd"}`, padding: "0.15rem 0.5rem", borderRadius: 999, display: "inline-flex", alignItems: "center", gap: 3 }}>
-                                <Clock size={11} /> SLA: {formatSla(c.recommended_sla_hours)}
-                              </span>
-                              {isFireOrShock && (
-                                <span style={{ fontSize: "0.65rem", fontWeight: 900, color: "#ffffff", background: "linear-gradient(135deg, #dc2626 0%, #991b1b 100%)", padding: "0.15rem 0.55rem", borderRadius: 999, display: "inline-flex", alignItems: "center", gap: 3, boxShadow: "0 2px 6px rgba(220,38,38,0.25)" }}>
-                                  ⚡ RAPID ACTION
-                                </span>
-                              )}
-                            </div>
-                            {c.description && (
-                              <div style={{ fontSize: "0.78rem", color: "#475569", marginBottom: "0.35rem", lineHeight: 1.45, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                                {c.description}
-                              </div>
-                            )}
-                            <div className="complaint-name" style={{ fontSize: "0.74rem", color: "#64748b", display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-                              <span>📍 {c.location}</span>
-                              <span style={{ color: "#059669", fontWeight: 700 }}>🏢 Dept: {c.recommended_department || c.category}</span>
-                              <span>🕐 {c.date}</span>
-                            </div>
-                          </div>
-                          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.35rem", flexShrink: 0 }}>
-                            <span className={`complaint-status ${c.status}`} style={{ padding: "0.35rem 0.85rem", fontSize: "0.78rem" }}>
-                              {c.status === "in_progress" ? "In Progress" : c.status.charAt(0).toUpperCase() + c.status.slice(1)}
-                            </span>
-                            <span style={{ fontSize: "0.65rem", color: "#64748b", fontWeight: 600 }}>
-                              {c.complaint_id_code || c.id}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
+                <button
+                  onClick={() => setCurrentTab("track")}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-800/80 hover:bg-emerald-800 text-white font-bold text-xs sm:text-sm border border-emerald-600/50 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ClipboardList size={16} />
+                  <span>Track Status</span>
+                </button>
               </div>
-            </div>
-          )}
+            </section>
 
-          {/* ── WEATHER TAB ───────────────────────────────────── */}
-          {currentTab === "weather" && (
-            <div className="fade-up fade-up-2">
-              <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
-                
-                {/* Weather Header Bar with Live GPS Button */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem", marginBottom: "1.5rem" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
-                    <div style={{ width: 48, height: 48, borderRadius: 14, background: "linear-gradient(135deg, #0284c7, #0369a1)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", boxShadow: "0 4px 14px rgba(2,132,199,0.3)" }}>
-                      <CloudSun style={{ width: 28, height: 28 }} />
-                    </div>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <h2 style={{ fontSize: "1.3rem", fontWeight: 900, color: "#042d20", margin: 0 }}>
-                          {t("navCitizenWeather")}
-                        </h2>
-                        <span style={{ background: "#ecfdf5", color: "#047857", border: "1px solid #a7f3d0", fontSize: "0.68rem", fontWeight: 800, padding: "0.15rem 0.5rem", borderRadius: 999 }}>
-                          ● {t("liveGpsStation")}
-                        </span>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.2rem", fontSize: "0.78rem", color: "#64748b" }}>
-                        <MapPin size={13} style={{ color: "#059669" }} />
-                        <span style={{ fontWeight: 700, color: "#0f172a" }}>{weatherLocationName}</span>
-                        {weatherData && <span>· Updated {weatherData.lastUpdated}</span>}
-                      </div>
-                    </div>
-                  </div>
+            {/* Welcome Card & Application Introduction */}
+            <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
+              <div className="max-w-3xl">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-extrabold mb-3">
+                  <Sparkles size={14} className="text-emerald-600" />
+                  Welcome to Civic Buzz &middot; Digital Governance Platform
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight">
+                  Empowering Every Citizen&apos;s Voice into Action.
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-600 mt-2.5 leading-relaxed">
+                  Civic Buzz is an AI-assisted rural and civic intelligence governance platform designed for citizens, field engineers, and Gram Panchayat administrations. Report community hazards (potholes, live wire shocks, water leaks, garbage accumulation) with automated AI Vision classification, precise GPS geotagging, real-time weather alerts, and regional mandi market crop pricing.
+                </p>
 
+                {/* Quick CTA row */}
+                <div className="flex items-center gap-3 mt-6 flex-wrap">
                   <button
-                    onClick={() => loadWeatherForUser()}
-                    disabled={weatherLoading}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.4rem",
-                      background: "#ffffff",
-                      border: "1px solid #cbd5e1",
-                      padding: "0.5rem 0.9rem",
-                      borderRadius: "10px",
-                      fontSize: "0.78rem",
-                      fontWeight: 800,
-                      color: "#0f172a",
-                      cursor: "pointer",
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
-                    }}
+                    onClick={() => setCurrentTab("report")}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs sm:text-sm shadow-md flex items-center gap-2 transition-all cursor-pointer"
                   >
-                    <RefreshCw size={14} className={weatherLoading ? "animate-spin" : ""} style={{ color: "#0284c7" }} />
-                    {weatherLoading ? "..." : t("refreshWeather")}
+                    <Plus size={16} />
+                    <span>Report a Civic Issue</span>
+                    <ArrowRight size={14} />
+                  </button>
+                  <button
+                    onClick={() => setCurrentTab("track")}
+                    className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs sm:text-sm border border-slate-300 transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <ClipboardList size={16} />
+                    <span>Track Live Village Issues ({complaints.length})</span>
                   </button>
                 </div>
-
-                {weatherLoading && !weatherData ? (
-                  <div style={{ padding: "3rem", textAlign: "center", color: "#64748b" }}>
-                    <Loader2 size={32} className="animate-spin" style={{ margin: "0 auto 0.75rem", color: "#0284c7" }} />
-                    <div style={{ fontWeight: 800, color: "#0f172a" }}>Acquiring Live GPS Satellite Weather Data...</div>
-                    <div style={{ fontSize: "0.8rem", marginTop: "0.25rem" }}>Calibrating village temperature, rainfall, and farming advisories</div>
-                  </div>
-                ) : weatherData ? (
-                  <>
-                    {/* Top Hero & Overview Grid */}
-                    <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
-                      
-                      {/* Hero Temperature Card */}
-                      <div
-                        style={{
-                          background: "linear-gradient(135deg, #0369a1 0%, #0c4a6e 100%)",
-                          color: "white",
-                          borderRadius: 18,
-                          padding: "1.35rem",
-                          position: "relative",
-                          overflow: "hidden",
-                          boxShadow: "0 10px 25px -5px rgba(3,105,161,0.35)",
-                          display: "flex",
-                          flexDirection: "column",
-                          justifyContent: "space-between"
-                        }}
-                      >
-                        <div>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                            <span style={{ fontSize: "0.72rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", background: "rgba(255,255,255,0.18)", padding: "0.2rem 0.6rem", borderRadius: 999 }}>
-                              {weatherData.conditionText}
-                            </span>
-                            <span style={{ fontSize: "2rem" }}>
-                              {weatherData.weatherCode === 0 ? "☀️" : weatherData.weatherCode <= 3 ? "⛅" : weatherData.weatherCode >= 61 && weatherData.weatherCode <= 82 ? "🌧️" : "🌤️"}
-                            </span>
-                          </div>
-
-                          <div style={{ fontSize: "2.8rem", fontWeight: 900, marginTop: "0.4rem", lineHeight: 1 }}>
-                            {weatherData.temperature}°C
-                          </div>
-                          <div style={{ fontSize: "0.8rem", opacity: 0.9, marginTop: "0.35rem" }}>
-                            Feels like {weatherData.feelsLike}°C · High: {weatherData.tempMax}° / Low: {weatherData.tempMin}°
-                          </div>
-                        </div>
-
-                        <div style={{ fontSize: "0.74rem", opacity: 0.85, borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: "0.6rem", marginTop: "0.75rem", display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                          <Navigation size={12} style={{ transform: `rotate(${weatherData.windDirection}deg)` }} />
-                          Wind {weatherData.windSpeed} km/h · {weatherData.isDay ? "Daytime" : "Nighttime"}
-                        </div>
-                      </div>
-
-                      {/* Metric 1: Humidity */}
-                      <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 18, padding: "1.25rem", display: "flex", flexDirection: "column", justifyContent: "space-between", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: "#0284c7" }}>
-                          <Droplets size={18} />
-                          <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>Humidity</span>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: "2.1rem", fontWeight: 900, color: "#0f172a", margin: "0.2rem 0" }}>
-                            {weatherData.humidity}%
-                          </div>
-                          <div style={{ fontSize: "0.74rem", fontWeight: 700, color: weatherData.humidity > 75 ? "#d97706" : "#059669" }}>
-                            {weatherData.humidity > 75 ? "High Moisture" : weatherData.humidity > 45 ? "Optimal Comfort" : "Dry Air"}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Metric 2: Wind Speed */}
-                      <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 18, padding: "1.25rem", display: "flex", flexDirection: "column", justifyContent: "space-between", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: "#059669" }}>
-                          <Wind size={18} />
-                          <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>Wind Speed</span>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: "2.1rem", fontWeight: 900, color: "#0f172a", margin: "0.2rem 0" }}>
-                            {weatherData.windSpeed} <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "#64748b" }}>km/h</span>
-                          </div>
-                          <div style={{ fontSize: "0.74rem", fontWeight: 700, color: weatherData.windSpeed > 25 ? "#dc2626" : "#059669" }}>
-                            {weatherData.windSpeed > 25 ? "Strong Gusts" : weatherData.windSpeed > 10 ? "Gentle Breeze" : "Calm Winds"}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Metric 3: Rain Probability */}
-                      <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 18, padding: "1.25rem", display: "flex", flexDirection: "column", justifyContent: "space-between", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: "#6366f1" }}>
-                          <CloudRain size={18} />
-                          <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>Rain Chance</span>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: "2.1rem", fontWeight: 900, color: "#0f172a", margin: "0.2rem 0" }}>
-                            {weatherData.precipitationProbability}%
-                          </div>
-                          <div style={{ fontSize: "0.74rem", fontWeight: 700, color: weatherData.precipitationProbability > 50 ? "#2563eb" : "#64748b" }}>
-                            {weatherData.precipitationProbability > 50 ? "Rain Highly Likely" : weatherData.precipitationProbability > 20 ? "Low Chance" : "Dry Skies"}
-                          </div>
-                        </div>
-                      </div>
-
-                    </div>
-
-                    {/* Farming & Agricultural Advisory Banner */}
-                    <div style={{ background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: 16, padding: "1.15rem 1.4rem", marginBottom: "1.5rem", display: "flex", alignItems: "flex-start", gap: "1rem" }}>
-                      <div style={{ width: 38, height: 38, borderRadius: 10, background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <Sparkles size={20} style={{ color: "#16a34a" }} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: "0.88rem", fontWeight: 800, color: "#14532d" }}>
-                          🌾 Agricultural &amp; Crop Weather Advisory for {session.village}
-                        </div>
-                        <div style={{ fontSize: "0.82rem", color: "#166534", marginTop: "0.25rem", lineHeight: 1.45 }}>
-                          {weatherData.farmingAdvisory}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Hourly Forecast Strip */}
-                    <div style={{ marginBottom: "1.5rem" }}>
-                      <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                        <Thermometer size={15} style={{ color: "#0284c7" }} />
-                        Hourly Temperature &amp; Sky Conditions (Next 8 Hours)
-                      </div>
-                      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.max(4, weatherData.hourlyForecast.length)}, 1fr)`, gap: "0.75rem", overflowX: "auto" }}>
-                        {weatherData.hourlyForecast.map((h, i) => (
-                          <div key={i} style={{ background: i === 0 ? "#eff6ff" : "#ffffff", border: i === 0 ? "1.5px solid #bfdbfe" : "1px solid #e2e8f0", borderRadius: 14, padding: "0.85rem 0.5rem", textAlign: "center" }}>
-                            <div style={{ fontSize: "0.74rem", fontWeight: 800, color: i === 0 ? "#1d4ed8" : "#64748b" }}>{h.time}</div>
-                            <div style={{ fontSize: "1.3rem", margin: "0.3rem 0" }}>
-                              {h.weatherCode === 0 ? "☀️" : h.weatherCode <= 3 ? "⛅" : h.weatherCode >= 61 ? "🌧️" : "🌤️"}
-                            </div>
-                            <div style={{ fontSize: "1.05rem", fontWeight: 900, color: "#0f172a" }}>{h.temp}°</div>
-                            <div style={{ fontSize: "0.68rem", color: "#64748b", marginTop: "0.2rem" }}>
-                              {h.rainProb > 0 ? `💧 ${h.rainProb}%` : h.condition}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* 7-Day Agricultural Outlook */}
-                    <div>
-                      <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                        <Calendar size={15} style={{ color: "#059669" }} />
-                        7-Day Village Weather Outlook
-                      </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(115px, 1fr))", gap: "0.75rem" }}>
-                        {weatherData.dailyForecast.map((d, i) => (
-                          <div key={i} style={{ background: i === 0 ? "#f8fafc" : "#ffffff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "1rem 0.6rem", textAlign: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.03)" }}>
-                            <div style={{ fontSize: "0.78rem", fontWeight: 800, color: i === 0 ? "#059669" : "#334155" }}>{d.dayName}</div>
-                            <div style={{ fontSize: "1.6rem", margin: "0.4rem 0" }}>
-                              {d.weatherCode === 0 ? "☀️" : d.weatherCode <= 3 ? "⛅" : d.weatherCode >= 61 ? "🌧️" : "🌤️"}
-                            </div>
-                            <div style={{ fontSize: "0.95rem", fontWeight: 800, color: "#0f172a" }}>
-                              {d.tempMax}° <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "#94a3b8" }}>{d.tempMin}°</span>
-                            </div>
-                            <div style={{ fontSize: "0.7rem", fontWeight: 700, color: d.rainProb > 40 ? "#2563eb" : "#64748b", marginTop: "0.3rem" }}>
-                              {d.rainProb > 0 ? `💧 ${d.rainProb}%` : d.condition}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                ) : null}
-
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* ── MARKET TAB ────────────────────────────────────── */}
-          {currentTab === "market" && (
-            <div className="fade-up fade-up-2">
-              <div className="glass-card" style={{ padding: "1.5rem" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.25rem" }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: "#ecfdf5", border: "1px solid #a7f3d0", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <TrendingUp style={{ width: 24, height: 24, color: "#059669" }} />
-                  </div>
-                  <div>
-                    <h2 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#042d20", margin: 0 }}>{t("mandiTitle")}</h2>
-                    <p style={{ fontSize: "0.8rem", color: "#64748b", margin: 0 }}>{t("mandiSub")}</p>
-                  </div>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem" }}>
-                  {[
-                    { crop: "Paddy (Grade A)", price: "₹2,300 / qtl", trend: "+₹50 today", color: "#16a34a" },
-                    { crop: "Cotton", price: "₹7,150 / qtl", trend: "+₹120 today", color: "#16a34a" },
-                    { crop: "Maize", price: "₹1,950 / qtl", trend: "-₹10 today", color: "#dc2626" },
-                  ].map(({ crop, price, trend, color }) => (
-                    <div key={crop} style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 16, padding: "1.25rem" }}>
-                      <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#0f172a" }}>{crop}</div>
-                      <div style={{ fontSize: "1.75rem", fontWeight: 900, color: "#042d20", margin: "0.4rem 0" }}>{price}</div>
-                      <div style={{ fontSize: "0.75rem", fontWeight: 700, color }}>{trend}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── NEWS TAB ──────────────────────────────────────── */}
-          {currentTab === "news" && (
-            <div className="fade-up fade-up-2">
-              <div className="glass-card" style={{ padding: "1.5rem" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.25rem" }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: "#f5f3ff", border: "1px solid #ddd6fe", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <FileText style={{ width: 24, height: 24, color: "#7c3aed" }} />
-                  </div>
-                  <div>
-                    <h2 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#042d20", margin: 0 }}>{t("newsTitle")}</h2>
-                    <p style={{ fontSize: "0.8rem", color: "#64748b", margin: 0 }}>{t("newsSub")}</p>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                  {[
-                    { title: "Gram Sabha General Meeting Scheduled", date: "Friday, 4:00 PM", desc: "Discussion on road repair works and water scheme allocation." },
-                    { title: "Free Health Checkup Camp at Primary School", date: "Saturday, 9:00 AM", desc: "Organized by ASHA workers and Mandal Health Department." },
-                  ].map(({ title, date, desc }) => (
-                    <div key={title} style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "1.125rem" }}>
-                      <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#0f172a", marginBottom: "0.25rem" }}>{title}</div>
-                      <div style={{ fontSize: "0.75rem", color: "#059669", fontWeight: 600, marginBottom: "0.5rem" }}>{date}</div>
-                      <div style={{ fontSize: "0.8rem", color: "#64748b", lineHeight: 1.5 }}>{desc}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-        </div>
-      </div>
-
-      {/* ── NEW COMPLAINT MODAL (AI Vision & Auto GPS Location) ──────── */}
-      {modalOpen && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(15,23,42,0.65)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem 1rem", overflowY: "auto" }}>
-          <div style={{ background: "#ffffff", borderRadius: 20, padding: "1.75rem", width: "100%", maxWidth: 540, boxShadow: "0 25px 50px -12px rgba(0,0,0,0.3)", position: "relative", maxHeight: "85vh", overflowY: "auto", margin: "auto" }}>
-            <button
-              onClick={() => { setModalOpen(false); resetFormState(); }}
-              style={{ position: "absolute", top: 16, right: 16, border: "none", background: "#f1f5f9", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#64748b" }}
-            >
-              <X style={{ width: 18, height: 18 }} />
-            </button>
-
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.25rem" }}>
-              <div style={{ width: 42, height: 42, borderRadius: 12, background: "linear-gradient(135deg, #059669 0%, #064e3b 100%)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(5,150,105,0.25)" }}>
-                <Camera style={{ width: 22, height: 22, color: "#ffffff" }} />
-              </div>
+        {/* ── TAB 1: TRACK ISSUES (Visual complaint feed from previous interface) ── */}
+        {currentTab === "track" && (
+          <div className="space-y-4 animate-fadeIn">
+            {/* Dedicated Page Header for Track Issues */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 style={{ fontSize: "1.2rem", fontWeight: 800, color: "#042d20", margin: 0, display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                  Report Civic Issue
-                  <span style={{ fontSize: "0.68rem", background: "#ecfdf5", color: "#059669", border: "1px solid #a7f3d0", padding: "0.15rem 0.5rem", borderRadius: 999, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "0.2rem" }}>
-                    <Sparkles style={{ width: 10, height: 10 }} /> AI Vision
-                  </span>
-                </h3>
-                <p style={{ fontSize: "0.78rem", color: "#64748b", margin: "0.15rem 0 0 0" }}>
-                  Upload an issue photo — AI will auto-write description and auto-detect location.
+                <div className="flex items-center gap-2">
+                  <ClipboardList size={20} className="text-emerald-700" />
+                  <h2 className="text-lg font-black text-slate-900">Track Civic Issues &amp; Resolution</h2>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Live monitoring of community complaints, SLA compliance, and municipal dispatch across Ward 1–4.
                 </p>
               </div>
+              <button
+                onClick={() => setCurrentTab("report")}
+                className="add-report-btn shrink-0"
+              >
+                <Plus size={15} />
+                <span>New Complaint</span>
+              </button>
             </div>
 
-            <form onSubmit={handleCreateComplaint} style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
-              
-              {/* Image Upload Box */}
-              <div>
-                <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#334155", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.4rem" }}>
-                  <span>Issue Photo Upload</span>
-                  {aiAutofilled && (
-                    <span style={{ color: "#059669", fontSize: "0.7rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                      <CheckCircle2 style={{ width: 12, height: 12 }} /> AI Auto-Analyzed
-                    </span>
-                  )}
-                </label>
-
-                {imagePreview ? (
-                  <div style={{ position: "relative", borderRadius: 14, overflow: "hidden", border: "2px solid #a7f3d0", background: "#f0fdf4", padding: "0.5rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
-                    <img src={imagePreview} alt="Uploaded Civic Issue" style={{ width: "100%", maxHeight: 180, objectFit: "cover", borderRadius: 10 }} />
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "0 0.25rem" }}>
-                      <span style={{ fontSize: "0.73rem", color: "#064e3b", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.3rem" }}>
-                        <ImageIcon style={{ width: 13, height: 13 }} /> {imageFile?.name || "Issue_Photo.jpg"}
-                      </span>
-                      <div style={{ display: "flex", gap: "0.5rem" }}>
-                        <label style={{ fontSize: "0.72rem", color: "#0284c7", fontWeight: 700, cursor: "pointer", background: "#e0f2fe", border: "1px solid #7dd3fc", padding: "0.25rem 0.6rem", borderRadius: 6, display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
-                          <RefreshCw style={{ width: 11, height: 11 }} /> Change
-                          <input type="file" accept="image/*" onChange={handleImageSelect} style={{ display: "none" }} />
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => { setImageFile(null); setImagePreview(null); setAiAutofilled(false); }}
-                          style={{ fontSize: "0.72rem", color: "#dc2626", fontWeight: 700, cursor: "pointer", background: "#fef2f2", border: "1px solid #fca5a5", padding: "0.25rem 0.6rem", borderRadius: 6, display: "inline-flex", alignItems: "center", gap: "0.25rem" }}
-                        >
-                          <Trash2 style={{ width: 11, height: 11 }} /> Remove
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={handleDropImage}
-                    style={{
-                      border: "2px dashed #a7f3d0",
-                      borderRadius: 14,
-                      background: "#f0fdf4",
-                      padding: "1.25rem 1rem",
-                      textAlign: "center",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                    }}
-                  >
-                    <input type="file" id="modal-image-upload" accept="image/*" onChange={handleImageSelect} style={{ display: "none" }} />
-                    <label htmlFor="modal-image-upload" style={{ cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                      <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "0.5rem" }}>
-                        <UploadCloud style={{ width: 22, height: 22, color: "#059669" }} />
-                      </div>
-                      <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#042d20", marginBottom: "0.15rem" }}>
-                        Click to upload or drag &amp; drop issue photo
-                      </span>
-                      <span style={{ fontSize: "0.72rem", color: "#64748b" }}>
-                        AI Vision will automatically write description and detect problem category
-                      </span>
-                    </label>
-                  </div>
-                )}
+            {/* Filter & Search Bar */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              {/* Search Bar */}
+              <div className="relative flex-1 max-w-md">
+                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search complaints by title, ward, category..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 focus:border-emerald-600 focus:outline-none"
+                />
               </div>
 
-              {/* AI Vision Analysis Loading Banner */}
-              {analyzingImage && (
-                <div style={{ background: "linear-gradient(135deg, #ecfdf5 0%, #dcfce7 100%)", border: "1px solid #86efac", borderRadius: 12, padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                  <Loader2 style={{ width: 20, height: 20, color: "#059669" }} />
-                  <div>
-                    <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#042d20" }}>AI Vision Analyzing Image...</div>
-                    <div style={{ fontSize: "0.72rem", color: "#047857" }}>Scanning civic defect features &amp; auto-writing description</div>
+              {/* Category Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+                <button
+                  onClick={() => setFilterCategory("all")}
+                  className={`civic-filter-pill-btn ${filterCategory === "all" ? "active" : ""}`}
+                >
+                  All ({complaints.length})
+                </button>
+                <button
+                  onClick={() => setFilterCategory("critical")}
+                  className={`civic-filter-pill-btn ${filterCategory === "critical" ? "active" : ""}`}
+                >
+                  🚨 Critical / Rapid SLA
+                </button>
+                <button
+                  onClick={() => setFilterCategory("in_progress")}
+                  className={`civic-filter-pill-btn ${filterCategory === "in_progress" ? "active" : ""}`}
+                >
+                  ⏳ In Progress
+                </button>
+                <button
+                  onClick={() => setFilterCategory("Roads")}
+                  className={`civic-filter-pill-btn ${filterCategory === "Roads" ? "active" : ""}`}
+                >
+                  🛣️ Roads
+                </button>
+                <button
+                  onClick={() => setFilterCategory("Water")}
+                  className={`civic-filter-pill-btn ${filterCategory === "Water" ? "active" : ""}`}
+                >
+                  💧 Water
+                </button>
+                <button
+                  onClick={() => setFilterCategory("Electricity")}
+                  className={`civic-filter-pill-btn ${filterCategory === "Electricity" ? "active" : ""}`}
+                >
+                  ⚡ Electricity
+                </button>
+              </div>
+
+              {/* Report Issue Button */}
+              <button
+                onClick={() => setModalOpen(true)}
+                className="add-report-btn shrink-0"
+              >
+                <Plus size={15} />
+                <span>New Complaint</span>
+              </button>
+            </div>
+
+            {/* Complaints Cards List (Identical design to previous interface) */}
+            <div className="complaints-card border border-slate-200 rounded-2xl bg-white shadow-xs overflow-hidden">
+              {filteredComplaints.length === 0 ? (
+                <div className="py-16 text-center text-slate-500">
+                  <CheckCircle2 size={40} className="text-emerald-600 mx-auto mb-2" />
+                  <div className="text-base font-bold text-slate-800">No civic complaints found</div>
+                  <div className="text-xs text-slate-400 mt-1 mb-4">
+                    All civic issues in this category are resolved or not yet reported.
                   </div>
+                  <button
+                    onClick={() => setModalOpen(true)}
+                    className="add-report-btn mx-auto"
+                  >
+                    <Plus size={15} />
+                    <span>Report a New Issue</span>
+                  </button>
                 </div>
-              )}
+              ) : (
+                filteredComplaints.map((c) => {
+                  const descText = (
+                    (c.title || "") +
+                    " " +
+                    (c.description || "") +
+                    " " +
+                    (c.category || "")
+                  ).toLowerCase();
+                  const isFireOrShock =
+                    /(fire|flame|smoke|blaze|burn|explosion|shock|current|electrocution|live wire|spark|short circuit)/.test(
+                      descText
+                    ) || (c.recommended_sla_hours !== undefined && c.recommended_sla_hours <= 0.5);
 
-              {/* AI Auto-Filled Badge */}
-              {aiAutofilled && !analyzingImage && (
-                <div style={{ background: "#f0fdf4", border: "1px solid #a7f3d0", borderRadius: 10, padding: "0.5rem 0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: "0.73rem", color: "#047857", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.3rem" }}>
-                    <Sparkles style={{ width: 13, height: 13, color: "#059669" }} />
-                    Description &amp; details auto-written by {aiModelName || "Nivaaran AI"}
-                  </span>
-                  <span style={{ fontSize: "0.68rem", background: "#dcfce7", color: "#064e3b", fontWeight: 800, padding: "0.1rem 0.4rem", borderRadius: 4 }}>
-                    Confidence 96%
-                  </span>
+                  const pScore = c.priority_score ?? (isFireOrShock ? 100 : 50);
+                  const pTier = (
+                    c.priority_tier ||
+                    (isFireOrShock
+                      ? "CRITICAL"
+                      : pScore >= 75
+                      ? "CRITICAL"
+                      : pScore >= 50
+                      ? "HIGH"
+                      : pScore >= 25
+                      ? "MEDIUM"
+                      : "LOW")
+                  ).toUpperCase();
+
+                  const tierColor =
+                    pTier === "CRITICAL"
+                      ? "#dc2626"
+                      : pTier === "HIGH"
+                      ? "#ea580c"
+                      : pTier === "MEDIUM"
+                      ? "#d97706"
+                      : "#16a34a";
+                  const tierBg =
+                    pTier === "CRITICAL"
+                      ? "#fef2f2"
+                      : pTier === "HIGH"
+                      ? "#fff7ed"
+                      : pTier === "MEDIUM"
+                      ? "#fffbeb"
+                      : "#f0fdf4";
+                  const tierBorder =
+                    pTier === "CRITICAL"
+                      ? "#fecaca"
+                      : pTier === "HIGH"
+                      ? "#ffedd5"
+                      : pTier === "MEDIUM"
+                      ? "#fef3c7"
+                      : "#bbf7d0";
+
+                  return (
+                    <div
+                      key={c.id}
+                      className="complaint-item"
+                      onClick={() => setSelectedDetailComplaint(c)}
+                      style={{
+                        padding: "1.1rem 1.25rem",
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: "1rem",
+                        borderBottom: "1px solid #f1f5f9",
+                        background: isFireOrShock ? "#fffbfb" : "transparent",
+                        cursor: "pointer",
+                        transition: "background 0.15s ease",
+                      }}
+                    >
+                      {c.imageUrl ? (
+                        <img
+                          src={c.imageUrl}
+                          alt={c.title}
+                          style={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: 12,
+                            objectFit: "cover",
+                            border: isFireOrShock ? "2px solid #ef4444" : "1px solid #a7f3d0",
+                            flexShrink: 0,
+                          }}
+                        />
+                      ) : (
+                        <div
+                          className="complaint-avatar"
+                          style={{
+                            background: isFireOrShock ? "#dc2626" : c.avatarBg || "#064e3b",
+                            width: 48,
+                            height: 48,
+                            borderRadius: 12,
+                            fontSize: "0.85rem",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {isFireOrShock ? "🚨" : c.id}
+                        </div>
+                      )}
+
+                      <div className="complaint-info" style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.4rem",
+                            flexWrap: "wrap",
+                            marginBottom: "0.25rem",
+                          }}
+                        >
+                          <span
+                            className="complaint-title"
+                            style={{ fontSize: "0.95rem", fontWeight: 800 }}
+                          >
+                            {c.title}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "0.68rem",
+                              fontWeight: 900,
+                              color: tierColor,
+                              background: tierBg,
+                              border: `1px solid ${tierBorder}`,
+                              padding: "0.15rem 0.5rem",
+                              borderRadius: 999,
+                            }}
+                          >
+                            {pTier} · {pScore}/100 Score
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "0.68rem",
+                              fontWeight: 800,
+                              color: isFireOrShock ? "#b91c1c" : "#0284c7",
+                              background: isFireOrShock ? "#fee2e2" : "#f0f9ff",
+                              border: `1px solid ${isFireOrShock ? "#fca5a5" : "#bae6fd"}`,
+                              padding: "0.15rem 0.5rem",
+                              borderRadius: 999,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 3,
+                            }}
+                          >
+                            <Clock size={11} /> SLA: {formatSla(c.recommended_sla_hours)}
+                          </span>
+                          {isFireOrShock && (
+                            <span
+                              style={{
+                                fontSize: "0.65rem",
+                                fontWeight: 900,
+                                color: "#ffffff",
+                                background: "linear-gradient(135deg, #dc2626 0%, #991b1b 100%)",
+                                padding: "0.15rem 0.55rem",
+                                borderRadius: 999,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 3,
+                                boxShadow: "0 2px 6px rgba(220,38,38,0.25)",
+                              }}
+                            >
+                              ⚡ RAPID ACTION
+                            </span>
+                          )}
+                        </div>
+
+                        {c.description && (
+                          <div
+                            style={{
+                              fontSize: "0.78rem",
+                              color: "#475569",
+                              marginBottom: "0.35rem",
+                              lineHeight: 1.45,
+                              display: "-webkit-box",
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
+                            }}
+                          >
+                            {c.description}
+                          </div>
+                        )}
+
+                        <div
+                          className="complaint-name"
+                          style={{
+                            fontSize: "0.74rem",
+                            color: "#64748b",
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: "0.5rem",
+                            alignItems: "center",
+                          }}
+                        >
+                          <span>📍 {c.location}</span>
+                          <span style={{ color: "#059669", fontWeight: 700 }}>
+                            🏢 Dept: {c.recommended_department || c.category}
+                          </span>
+                          <span>🕐 {c.date}</span>
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "flex-end",
+                          gap: "0.35rem",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span
+                          className={`complaint-status ${c.status}`}
+                          style={{ padding: "0.35rem 0.85rem", fontSize: "0.78rem" }}
+                        >
+                          {c.status === "in_progress"
+                            ? "In Progress"
+                            : c.status === "resolution_submitted"
+                            ? "Audit Pending"
+                            : c.status.charAt(0).toUpperCase() + c.status.slice(1)}
+                        </span>
+                        <span style={{ fontSize: "0.65rem", color: "#64748b", fontWeight: 600 }}>
+                          {c.complaint_id_code || c.id}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 2: REPORT ISSUE (Full in-page AI submission form) ─────── */}
+        {currentTab === "report" && (
+          <div className="max-w-3xl mx-auto bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-md animate-fadeIn">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+                  <Plus className="text-emerald-700" size={22} />
+                  Report a Civic Problem
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Upload photos with automatic AI Vision classification or write issue details below.
+                </p>
+              </div>
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                Gram Panchayat Portal
+              </span>
+            </div>
+
+            <form onSubmit={handleSubmitComplaint} className="space-y-5">
+              {/* Photo Upload Zone */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-2">
+                  Photo Evidence (AI Vision Auto-Classification)
+                </label>
+                <div
+                  style={{
+                    border: "2px dashed #a7f3d0",
+                    borderRadius: 16,
+                    padding: "1.5rem",
+                    textAlign: "center",
+                    background: "#f0fdf4",
+                    position: "relative",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => document.getElementById("citizen-file-input")?.click()}
+                >
+                  <input
+                    id="citizen-file-input"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    style={{ display: "none" }}
+                  />
+
+                  {analyzingImage ? (
+                    <div className="py-4">
+                      <Loader2 size={32} className="animate-spin text-emerald-700 mx-auto mb-2" />
+                      <div className="text-xs font-bold text-emerald-900">
+                        Analyzing photo with Groq AI Vision...
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-1">
+                        Extracting hazard severity, category &amp; SLA urgency
+                      </div>
+                    </div>
+                  ) : imagePreview ? (
+                    <div className="space-y-2">
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="h-44 mx-auto rounded-xl object-cover shadow-sm border border-emerald-300"
+                      />
+                      <div className="text-xs text-emerald-800 font-bold flex items-center justify-center gap-1">
+                        <CheckCircle2 size={14} /> Photo Loaded &middot; Click to change
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-2">
+                        <UploadCloud size={24} />
+                      </div>
+                      <div className="text-sm font-bold text-slate-800">
+                        Click or drag to upload issue photo
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1">
+                        AI automatically identifies potholes, pipe leaks, trash, broken streetlights &amp; live wires
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
 
-              {/* Real-time Fire & Shock Emergency Alert Banner */}
+              {/* Emergency Banner alert if shock or fire */}
               {(() => {
-                const formText = (newTitle + " " + newDescription + " " + newCategory).toLowerCase();
-                const isFormFire = /(fire|flame|smoke|blaze|burn|explosion|gas leak|cylinder)/.test(formText);
-                const isFormShock = /(shock|current|electrocution|live wire|spark|sparking|short circuit|high voltage)/.test(formText);
+                const combined = (newTitle + " " + newDescription + " " + newCategory).toLowerCase();
+                const isFormFire = /(fire|flame|smoke|blaze|burn|explosion|gas leak|cylinder)/.test(combined);
+                const isFormShock = /(shock|current|electrocution|live wire|spark|sparking|short circuit|high voltage)/.test(combined);
                 const isFormEmergency = isFormFire || isFormShock || newCategory === "Fire & Disaster Emergency";
 
                 if (!isFormEmergency) return null;
 
                 return (
-                  <div style={{ background: "linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)", border: "2px solid #ef4444", borderRadius: 12, padding: "0.85rem 1rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                    <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", flexShrink: 0 }}>
+                  <div className="p-3.5 rounded-xl bg-rose-50 border-2 border-rose-400 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-rose-600 text-white flex items-center justify-center shrink-0">
                       <Flame size={20} />
                     </div>
                     <div>
-                      <div style={{ fontSize: "0.84rem", fontWeight: 900, color: "#991b1b", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                      <div className="text-xs font-black text-rose-900">
                         🚨 CRITICAL LIFE SAFETY EMERGENCY DETECTED
                       </div>
-                      <div style={{ fontSize: "0.74rem", color: "#b91c1c", marginTop: 2, lineHeight: 1.4 }}>
-                        Assigned <strong>⚡ 30-Minute Rapid Action SLA</strong> with instant alert dispatch to <strong>{isFormFire ? "Fire Emergency (101)" : "Electricity Emergency Rapid Wing (1912)"}</strong>.
+                      <div className="text-[11px] text-rose-700 leading-tight mt-0.5">
+                        Assigned <strong>⚡ 30-Minute Rapid Action SLA</strong> with instant notification to{" "}
+                        <strong>{isFormFire ? "Fire Emergency (101)" : "Electricity Board Emergency Wing (1912)"}</strong>.
                       </div>
                     </div>
                   </div>
@@ -1320,57 +1079,62 @@ export default function CitizenDashboard() {
 
               {/* Title Input */}
               <div>
-                <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "0.35rem" }}>Issue Title</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">Issue Title</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Severe asphalt damage and deep pothole on road"
+                  placeholder="e.g. Deep pothole crater in front of Primary School"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  style={{ width: "100%", padding: "0.65rem 0.85rem", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: "0.85rem", outline: "none" }}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-600 focus:outline-none"
                 />
               </div>
 
               {/* Auto-Written Description */}
               <div>
-                <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#334155", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.35rem" }}>
-                  <span>Issue Description</span>
-                  {aiAutofilled && <span style={{ fontSize: "0.68rem", color: "#059669", fontWeight: 700 }}>✨ AI Generated (Editable)</span>}
-                </label>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="text-xs font-bold text-slate-700">Issue Description</label>
+                  {aiAutofilled && (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      ✨ AI Generated ({aiModelName || "Groq AI"})
+                    </span>
+                  )}
+                </div>
                 <textarea
                   rows={3}
                   required
-                  placeholder="Upload photo for AI auto-description or write details here..."
+                  placeholder="Upload a photo to auto-generate description or type details..."
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
-                  style={{ width: "100%", padding: "0.65rem 0.85rem", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: "0.83rem", outline: "none", resize: "vertical", fontFamily: "inherit" }}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-600 focus:outline-none"
                 />
               </div>
 
-              {/* Category & Urgency Row */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              {/* Category & Urgency */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "0.35rem" }}>Category</label>
+                  <label className="text-xs font-bold text-slate-700 block mb-1.5">Category</label>
                   <select
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
-                    style={{ width: "100%", padding: "0.65rem 0.85rem", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: "0.83rem", outline: "none", background: "#ffffff" }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:border-emerald-600 focus:outline-none"
                   >
                     <option value="Roads & Infrastructure">Roads &amp; Infrastructure</option>
                     <option value="Water Supply">Water Supply</option>
-                    <option value="Sanitation">Sanitation &amp; Waste</option>
-                    <option value="Electricity">Electricity &amp; Streetlights</option>
+                    <option value="Sanitation & Waste">Sanitation &amp; Waste</option>
+                    <option value="Electricity-related Civic Issue">Electricity &amp; Streetlights</option>
                     <option value="Fire & Disaster Emergency">🔥 Fire &amp; Disaster Emergency (30m Rapid SLA)</option>
-                    <option value="Electricity">⚡ Electric Shock &amp; Live Wire Hazard (30m Rapid SLA)</option>
+                    <option value="Electricity-related Civic Issue">⚡ Electric Shock &amp; Live Wire (30m Rapid SLA)</option>
                     <option value="Health & Other">Health &amp; Other</option>
                   </select>
                 </div>
+
                 <div>
-                  <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "0.35rem" }}>Urgency Level</label>
+                  <label className="text-xs font-bold text-slate-700 block mb-1.5">Urgency Level</label>
                   <select
                     value={urgencyLevel}
                     onChange={(e) => setUrgencyLevel(e.target.value)}
-                    style={{ width: "100%", padding: "0.65rem 0.85rem", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: "0.83rem", outline: "none", background: "#ffffff" }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:border-emerald-600 focus:outline-none"
                   >
                     <option value="High">🔴 High Urgency</option>
                     <option value="Medium">🟡 Medium Urgency</option>
@@ -1379,88 +1143,323 @@ export default function CitizenDashboard() {
                 </div>
               </div>
 
-              {/* Location with Auto-Detect Button */}
+              {/* Location with GPS Auto-Detect */}
               <div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.35rem" }}>
-                  <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#334155" }}>Location / Ward</label>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="text-xs font-bold text-slate-700">Location / Ward</label>
                   <button
                     type="button"
                     onClick={handleDetectLocation}
                     disabled={detectingLocation}
-                    style={{
-                      fontSize: "0.72rem",
-                      fontWeight: 700,
-                      color: "#047857",
-                      background: "#ecfdf5",
-                      border: "1px solid #a7f3d0",
-                      borderRadius: 6,
-                      padding: "0.2rem 0.55rem",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.25rem",
-                      transition: "all 0.2s ease"
-                    }}
+                    className="text-[11px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
                   >
                     {detectingLocation ? (
                       <>
-                        <Loader2 style={{ width: 11, height: 11 }} /> Detecting GPS...
+                        <Loader2 size={11} className="animate-spin" /> Detecting GPS...
                       </>
                     ) : (
                       <>
-                        <MapPin style={{ width: 11, height: 11, color: "#059669" }} /> Auto-Detect Location (GPS)
+                        <MapPin size={11} className="text-emerald-700" /> Auto-Detect Location (GPS)
                       </>
                     )}
                   </button>
                 </div>
-                <div style={{ position: "relative" }}>
+                <div className="relative">
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Ward 4, Market Road, Shyampet"
+                    placeholder="e.g. Ward 4, Main Market Road, Shyampet"
                     value={newLocation}
                     onChange={(e) => setNewLocation(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "0.65rem 0.85rem",
-                      borderRadius: 10,
-                      border: locationDetected ? "1px solid #059669" : "1px solid #cbd5e1",
-                      background: locationDetected ? "#f0fdf4" : "#ffffff",
-                      fontSize: "0.83rem",
-                      outline: "none"
-                    }}
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-xs focus:outline-none ${
+                      locationDetected ? "border-emerald-500 bg-emerald-50/40" : "border-slate-300"
+                    }`}
                   />
                   {locationDetected && (
-                    <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: "0.68rem", fontWeight: 700, color: "#059669", background: "#dcfce7", padding: "0.15rem 0.4rem", borderRadius: 4, display: "flex", alignItems: "center", gap: "0.2rem" }}>
-                      <CheckCircle2 style={{ width: 10, height: 10 }} /> GPS Verified
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-extrabold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <CheckCircle2 size={11} /> GPS Verified
                     </span>
                   )}
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
+              {/* Submit Buttons */}
+              <div className="flex gap-3 pt-3">
                 <button
                   type="button"
-                  onClick={() => { setModalOpen(false); resetFormState(); }}
-                  style={{ flex: 1, padding: "0.7rem", borderRadius: 10, border: "1px solid #cbd5e1", background: "#ffffff", color: "#475569", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}
+                  onClick={() => {
+                    resetFormState();
+                    setCurrentTab("track");
+                  }}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-600 font-bold text-xs hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  style={{ flex: 1.5, padding: "0.7rem", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #059669 0%, #064e3b 100%)", color: "#ffffff", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem", boxShadow: "0 4px 12px rgba(5,150,105,0.25)" }}
+                  disabled={submittingComplaint}
+                  className="flex-[1.5] py-2.5 rounded-xl bg-gradient-to-r from-emerald-800 to-emerald-700 hover:from-emerald-900 hover:to-emerald-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer disabled:opacity-50"
                 >
-                  <Send style={{ width: 15, height: 15 }} /> Submit Issue Report
+                  {submittingComplaint ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" /> Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Send size={14} /> Submit Issue Report
+                    </>
+                  )}
                 </button>
               </div>
-
             </form>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ── MODAL: COMPLAINT LIFECYCLE TRACKER ────────────────────────────── */}
+        {/* ── TAB 3: HISTORY (Resolved complaints archive with evidence) ──── */}
+        {currentTab === "history" && (
+          <div className="space-y-4 animate-fadeIn">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <FileCheck2 className="text-emerald-700" size={20} />
+                  Resolved Complaints History
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Complete archive of village complaints verified and resolved by Gram Panchayat teams.
+                </p>
+              </div>
+              <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-900 border border-emerald-200">
+                {resolvedComplaints.length} Total Resolved
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {resolvedComplaints.length === 0 ? (
+                <div className="col-span-2 py-16 text-center text-slate-500 bg-white rounded-2xl border border-slate-200">
+                  <CheckCircle2 size={36} className="text-emerald-600 mx-auto mb-2" />
+                  <div className="text-sm font-bold text-slate-800">No resolved history yet</div>
+                  <div className="text-xs text-slate-400 mt-1">
+                    Resolved complaints with field verification photos will appear here.
+                  </div>
+                </div>
+              ) : (
+                resolvedComplaints.map((c) => (
+                  <div
+                    key={c.id}
+                    onClick={() => setSelectedDetailComplaint(c)}
+                    className="p-4 bg-white rounded-2xl border border-slate-200 hover:border-emerald-500 transition-all shadow-xs cursor-pointer flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                          {c.complaint_id_code || c.id}
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                          <Check size={10} /> Verified &amp; Resolved
+                        </span>
+                      </div>
+
+                      <h3 className="text-sm font-extrabold text-slate-900 line-clamp-1">{c.title}</h3>
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">{c.description}</p>
+
+                      {/* Photo evidence preview */}
+                      <div className="grid grid-cols-2 gap-2 mt-3">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 block mb-1">Before:</span>
+                          {c.imageUrl ? (
+                            <img
+                              src={c.imageUrl}
+                              alt="Reported"
+                              className="h-24 w-full object-cover rounded-lg border border-slate-200"
+                            />
+                          ) : (
+                            <div className="h-24 bg-slate-100 rounded-lg flex items-center justify-center text-[10px] text-slate-400">
+                              No photo
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold text-emerald-700 block mb-1">
+                            After Resolution:
+                          </span>
+                          {c.resolution_image_url ? (
+                            <img
+                              src={c.resolution_image_url}
+                              alt="Resolved"
+                              className="h-24 w-full object-cover rounded-lg border border-emerald-400"
+                            />
+                          ) : (
+                            <div className="h-24 bg-emerald-50/50 rounded-lg flex items-center justify-center text-[10px] text-emerald-700 font-semibold text-center p-1">
+                              Repaired &amp; Audited
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 mt-3 flex justify-between items-center text-[11px] text-slate-500">
+                      <span>📍 {c.location}</span>
+                      <span className="text-emerald-700 font-bold">View Audit Proof &rarr;</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 4: HELP DESK (Helplines, Village Notices, Weather & Mandi) ── */}
+        {currentTab === "help" && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* 24/7 Emergency Helplines Section */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
+              <div className="flex items-center gap-2 mb-4">
+                <PhoneCall className="text-rose-600" size={20} />
+                <h2 className="text-lg font-extrabold text-slate-900">
+                  Emergency Helplines &amp; Panchayat Directory
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {/* Fire 101 */}
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-extrabold text-rose-900">🔥 Fire &amp; Disaster Response</div>
+                    <div className="text-[11px] text-rose-700">Immediate Rapid Action</div>
+                  </div>
+                  <a
+                    href="tel:101"
+                    className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs"
+                  >
+                    Call 101
+                  </a>
+                </div>
+
+                {/* Electricity 1912 */}
+                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-extrabold text-amber-900">⚡ Electricity (TSSPDCL)</div>
+                    <div className="text-[11px] text-amber-700">Live Wire Shock / Outage</div>
+                  </div>
+                  <a
+                    href="tel:1912"
+                    className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs"
+                  >
+                    Call 1912
+                  </a>
+                </div>
+
+                {/* Ambulance 108 */}
+                <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-extrabold text-blue-900">🚑 Ambulance / Medical</div>
+                    <div className="text-[11px] text-blue-700">Rural PHC Emergency</div>
+                  </div>
+                  <a
+                    href="tel:108"
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs"
+                  >
+                    Call 108
+                  </a>
+                </div>
+
+                {/* Police 100/112 */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-extrabold text-slate-900">🚓 Police Assistance</div>
+                    <div className="text-[11px] text-slate-600">Dial 100 or 112</div>
+                  </div>
+                  <a
+                    href="tel:112"
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-xs"
+                  >
+                    Call 112
+                  </a>
+                </div>
+
+                {/* Women Helpline 1091 */}
+                <div className="p-3.5 rounded-xl bg-pink-50 border border-pink-200 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-extrabold text-pink-900">🛡️ Women Safety Helpline</div>
+                    <div className="text-[11px] text-pink-700">24x7 State Support</div>
+                  </div>
+                  <a
+                    href="tel:1091"
+                    className="px-3 py-1.5 rounded-lg bg-pink-600 hover:bg-pink-700 text-white font-extrabold text-xs"
+                  >
+                    Call 1091
+                  </a>
+                </div>
+
+                {/* Gram Panchayat Office */}
+                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-extrabold text-emerald-900">🏛️ Gram Panchayat Secretary</div>
+                    <div className="text-[11px] text-emerald-700">Warangal Rural Office</div>
+                  </div>
+                  <a
+                    href="tel:0870245678"
+                    className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs"
+                  >
+                    Contact Desk
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Live Weather & Mandi Prices Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Weather Card */}
+              <div className="bg-gradient-to-br from-sky-700 to-sky-900 text-white p-5 rounded-2xl shadow-xs">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full">
+                      ● Live Satellite Weather
+                    </span>
+                    <div className="text-xl font-black mt-2">
+                      {weatherData ? `${weatherData.temperature}°C` : "31°C"}
+                    </div>
+                    <div className="text-xs text-sky-100">{weatherLocationName}</div>
+                  </div>
+                  <span className="text-3xl">
+                    {weatherData ? (weatherData.weatherCode === 0 ? "☀️" : "⛅") : "☀️"}
+                  </span>
+                </div>
+                <div className="text-xs text-sky-100 border-t border-white/20 pt-2 flex justify-between">
+                  <span>Humidity: {weatherData?.humidity ?? 65}%</span>
+                  <span>Wind: {weatherData?.windSpeed ?? 12} km/h</span>
+                </div>
+              </div>
+
+              {/* Mandi Rates Card */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                <div className="flex justify-between items-center mb-3">
+                  <div className="text-xs font-extrabold text-emerald-800 flex items-center gap-1.5">
+                    <TrendingUp size={14} /> Regional Mandi Market Prices
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400">Warangal Mandi</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                    <div className="text-[11px] text-slate-500 font-bold">Paddy (Fine)</div>
+                    <div className="font-extrabold text-slate-900 mt-0.5">₹2,320/q</div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                    <div className="text-[11px] text-slate-500 font-bold">Cotton</div>
+                    <div className="font-extrabold text-slate-900 mt-0.5">₹7,450/q</div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                    <div className="text-[11px] text-slate-500 font-bold">Maize</div>
+                    <div className="font-extrabold text-slate-900 mt-0.5">₹2,090/q</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* ── MODAL: COMPLAINT LIFECYCLE TRACKER (Interactive timeline & proof) ──── */}
       {selectedDetailComplaint && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-xl w-full border border-slate-200 shadow-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto animate-scaleUp">
@@ -1485,7 +1484,7 @@ export default function CitizenDashboard() {
                   {selectedDetailComplaint.title}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  📍 {selectedDetailComplaint.location} · {selectedDetailComplaint.date}
+                  📍 {selectedDetailComplaint.location} &middot; {selectedDetailComplaint.date}
                 </p>
               </div>
 
@@ -1521,8 +1520,12 @@ export default function CitizenDashboard() {
                       ? `To ${selectedDetailComplaint.assigned_employee_name}`
                       : "Pending assignment",
                   },
-                  { label: "On-Site Work", done: isInProgress, desc: "Engineer in action" },
-                  { label: "Verified & Resolved", done: isResolved, desc: isResolved ? "Audit confirmed" : isAwaiting ? "Awaiting audit" : "Pending completion" },
+                  { label: "On-Site Work", done: isInProgress, desc: "Field engineer in action" },
+                  {
+                    label: "Verified & Resolved",
+                    done: isResolved,
+                    desc: isResolved ? "Audit confirmed" : isAwaiting ? "Awaiting audit" : "Pending completion",
+                  },
                 ];
 
                 return (
@@ -1531,9 +1534,7 @@ export default function CitizenDashboard() {
                       <div key={idx} className="flex items-start gap-3">
                         <div
                           className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
-                            step.done
-                              ? "bg-emerald-600 text-white shadow-xs"
-                              : "bg-slate-200 text-slate-400"
+                            step.done ? "bg-emerald-600 text-white shadow-xs" : "bg-slate-200 text-slate-400"
                           }`}
                         >
                           {step.done ? <Check className="h-3.5 w-3.5" /> : idx + 1}
@@ -1555,11 +1556,9 @@ export default function CitizenDashboard() {
               })()}
             </div>
 
-            {/* Before / After Evidence Photos (if resolution submitted) */}
+            {/* Photo Evidence: Reported vs Resolution Proof */}
             <div className="space-y-2">
-              <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Photo Evidence:
-              </p>
+              <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Photo Evidence:</p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold text-slate-500">Reported Photo:</span>
@@ -1577,9 +1576,7 @@ export default function CitizenDashboard() {
                 </div>
 
                 <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-emerald-800">
-                    Resolution Proof:
-                  </span>
+                  <span className="text-[10px] font-bold text-emerald-800">Resolution Proof:</span>
                   {selectedDetailComplaint.resolution_image_url ? (
                     <img
                       src={selectedDetailComplaint.resolution_image_url}
@@ -1613,9 +1610,7 @@ export default function CitizenDashboard() {
               </div>
               {selectedDetailComplaint.resolution_notes && (
                 <div className="pt-2 border-t border-slate-200">
-                  <span className="text-slate-400 font-semibold block mb-0.5">
-                    Repair Summary:
-                  </span>
+                  <span className="text-slate-400 font-semibold block mb-0.5">Repair Summary:</span>
                   <p className="text-slate-800">{selectedDetailComplaint.resolution_notes}</p>
                 </div>
               )}
@@ -1631,6 +1626,142 @@ export default function CitizenDashboard() {
         </div>
       )}
 
+      {/* ── QUICK REPORT MODAL (Callable from any tab) ─────────────────── */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto animate-scaleUp">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                <Plus className="text-emerald-700" size={18} />
+                Quick Issue Report
+              </h3>
+              <button
+                onClick={() => {
+                  setModalOpen(false);
+                  resetFormState();
+                }}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitComplaint} className="space-y-4">
+              {/* Photo Input */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Upload Photo (Groq AI Auto-Detect)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  className="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-800 cursor-pointer"
+                />
+                {analyzingImage && (
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-bold mt-1">
+                    <Loader2 size={12} className="animate-spin" /> Analyzing image...
+                  </div>
+                )}
+                {imagePreview && (
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="h-28 rounded-lg mt-2 object-cover border border-emerald-300"
+                  />
+                )}
+              </div>
+
+              {/* Title */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Issue Title</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Broken water pipe leaking on main road"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-emerald-600"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Description</label>
+                <textarea
+                  rows={2}
+                  required
+                  placeholder="Details of the civic problem..."
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-emerald-600"
+                />
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Category</label>
+                <select
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:outline-none"
+                >
+                  <option value="Roads & Infrastructure">Roads &amp; Infrastructure</option>
+                  <option value="Water Supply">Water Supply</option>
+                  <option value="Sanitation & Waste">Sanitation &amp; Waste</option>
+                  <option value="Electricity-related Civic Issue">Electricity &amp; Streetlights</option>
+                  <option value="Fire & Disaster Emergency">🔥 Fire &amp; Disaster Emergency (30m Rapid SLA)</option>
+                  <option value="Electricity-related Civic Issue">⚡ Live Wire Shock Hazard (30m Rapid SLA)</option>
+                  <option value="Health & Other">Health &amp; Other</option>
+                </select>
+              </div>
+
+              {/* Location */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-xs font-bold text-slate-700">Location</label>
+                  <button
+                    type="button"
+                    onClick={handleDetectLocation}
+                    disabled={detectingLocation}
+                    className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200"
+                  >
+                    {detectingLocation ? "Detecting..." : "Auto GPS"}
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Ward 4, Shyampet"
+                  value={newLocation}
+                  onChange={(e) => setNewLocation(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalOpen(false);
+                    resetFormState();
+                  }}
+                  className="flex-1 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingComplaint}
+                  className="flex-1 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-bold disabled:opacity-50"
+                >
+                  {submittingComplaint ? "Submitting..." : "Submit Report"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

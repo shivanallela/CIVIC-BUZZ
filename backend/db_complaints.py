@@ -1,5 +1,5 @@
 """
-Civic Catalyst — Complaints Database Manager
+Civic -Buzz — Complaints Database Manager
 Reads and writes first target Supabase cloud.
 If Supabase is offline or unreachable, seamlessly falls back to local SQLite (inventory.db).
 """

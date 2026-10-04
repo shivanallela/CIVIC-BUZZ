@@ -1,10 +1,20 @@
 import sqlite3
 import os
+import shutil
 import json
 from datetime import datetime
 from typing import Dict, Any, List
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "inventory.db")
+ORIGINAL_DB_PATH = os.path.join(os.path.dirname(__file__), "inventory.db")
+if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+    DB_PATH = "/tmp/inventory.db"
+    if os.path.exists(ORIGINAL_DB_PATH) and not os.path.exists(DB_PATH):
+        try:
+            shutil.copy2(ORIGINAL_DB_PATH, DB_PATH)
+        except Exception:
+            pass
+else:
+    DB_PATH = ORIGINAL_DB_PATH
 
 
 def get_db_connection():

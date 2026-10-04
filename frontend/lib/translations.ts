@@ -3,7 +3,7 @@ export type Language = "en" | "hi" | "te";
 export const translations: Record<Language, Record<string, string>> = {
   en: {
     // Header & Meta
-    systemTitle: "Civic Catalyst",
+    systemTitle: "Civic -Buzz",
     subTitle: "ASHA Smart Inventory v1.0",
     roleLabel: "ASHA Worker",
     wardInfo: "ASHA Worker · Ward 3 & 4",

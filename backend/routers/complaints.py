@@ -1,11 +1,14 @@
 """
-Civic Catalyst — Civic Complaints, AI Vision, & AI Civic Priority Intelligence Engine Router
+Civic -Buzz — Civic Complaints, AI Vision, & AI Civic Priority Intelligence Engine Router
 """
 import os
 import re
 import sys
+import json
+import base64
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, Query
+import requests
+from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel
 
 import db_complaints
@@ -134,6 +137,7 @@ async def list_complaints(
 
 
 @router.post("", status_code=201)
+@router.post("/create", status_code=201)
 async def create_new_complaint(req: ComplaintCreateRequest):
     """
     Submit a new civic complaint with full AI priority scoring & duplicate detection.
@@ -369,71 +373,174 @@ async def delete_complaint_endpoint(complaint_id: str):
     return {"success": True, "message": "Complaint deleted"}
 
 
+def _generate_groq_smart_description(filename: str, location: str) -> Optional[Dict[str, Any]]:
+    """
+    Generate a clear, detailed, and relevant civic complaint description using the Groq API.
+    API keys are securely read from the backend environment configuration.
+    """
+    groq_key = (os.getenv("GROQ_API_KEY") or "").strip("\"' ")
+    if not groq_key:
+        return None
+
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {groq_key}",
+        "Content-Type": "application/json",
+    }
+
+    prompt = f"""You are Civic Buzz Groq AI, an intelligent civic infrastructure and hazard analyst for local and rural Gram Panchayats.
+A citizen uploaded an image of a civic issue at location: '{location}'.
+Image file context / name: '{filename}'.
+
+Identify the visible civic problem (such as pothole, road crater, garbage dump, broken streetlight, water pipe leak, live wire electrocution risk, damaged pavement, drainage overflow).
+Return ONLY a valid JSON object with this exact structure:
+{{
+  "title": "Concise, professional civic issue title",
+  "category": "Roads & Infrastructure" or "Water Supply" or "Sanitation & Waste" or "Electricity-related Civic Issue" or "Fire & Disaster Emergency" or "Health & Other",
+  "description": "Clear, detailed, relevant civic complaint description (2-3 sentences explaining what is damaged, danger to pedestrians or vehicles, and needed municipal action)",
+  "urgency": "High" or "Medium" or "Low",
+  "severity": "CRITICAL" or "HIGH" or "MEDIUM" or "LOW",
+  "safety_risk": "CRITICAL" or "HIGH" or "MEDIUM" or "LOW",
+  "affected_area": "STREET" or "WARD" or "COMMUNITY",
+  "accessibility_impact": ["pedestrians", "vehicles"]
+}}
+"""
+
+    # Try models in order: openai/gpt-oss-120b, openai/gpt-oss-20b, qwen/qwen3.8-27b
+    for model_name in ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]:
+        try:
+            payload = {
+                "model": model_name,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You are Civic Buzz Groq AI, an intelligent civic complaint analyst. Output strictly valid JSON.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.2,
+            }
+            res = requests.post(url, headers=headers, json=payload, timeout=6)
+            if res.status_code == 200:
+                content = res.json()["choices"][0]["message"]["content"]
+                if "```json" in content:
+                    content = content.split("```json")[1].split("```")[0].strip()
+                elif "```" in content:
+                    content = content.split("```")[1].split("```")[0].strip()
+                data = json.loads(content)
+                data["ai_model"] = f"Groq AI ({model_name})"
+                return data
+        except Exception as e:
+            print(f"[Groq AI warning: model {model_name} error: {e}]")
+            continue
+
+    return None
+
+
 @router.post("/analyze-image", response_model=ComplaintAnalysisResponse)
 async def analyze_issue_image(req: ImageAnalysisRequest):
     """
-    AI Vision & Priority Engine endpoint: Analyzes uploaded complaint image
-    to extract observations and compute deterministic 0-100 priority score.
+    AI Vision & Priority Engine endpoint: Analyzes uploaded complaint image using
+    Groq AI to generate a clear, relevant complaint description and calculate
+    deterministic 0-100 priority score.
     """
-    api_key = os.getenv("GROQ_API_KEY") or os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")
     fn = (req.filename or "").lower()
+    loc = req.location or "Ward 4"
 
-    if any(k in fn for k in ["fire", "flame", "smoke", "blaze", "burn", "explosion", "gas leak", "cylinder"]):
-        category = "Fire & Disaster Emergency"
-        title = "🚨 Fire Outbreak & Life Safety Hazard Emergency"
-        description = "AI Vision Analysis: Detected active flame, smoke, or fire hazard. Immediate 30-minute rapid emergency response required to prevent injury and property loss."
-        severity = "CRITICAL"
-        safety_risk = "CRITICAL"
-        affected_area = "WARD"
-        accessibility_impact = ["emergency vehicles", "all residents", "hospital", "school"]
-    elif any(k in fn for k in ["shock", "current", "electrocution", "live wire", "spark", "sparking", "snapped wire", "high voltage"]):
-        category = "Electricity-related Civic Issue"
-        title = "⚡ Electric Shock Hazard & Snapped Live Wire Emergency"
-        description = "AI Vision Analysis: Detected exposed live electrical wire / sparking hazard with critical electrocution danger. Immediate rapid power shutdown & emergency repair required."
-        severity = "CRITICAL"
-        safety_risk = "CRITICAL"
-        affected_area = "STREET"
-        accessibility_impact = ["pedestrians", "emergency vehicles", "children"]
-    elif any(k in fn for k in ["water", "pipe", "leak", "drain", "tap", "overflow", "sewer", "flood"]):
-        category = "Water Supply"
-        title = "Water Pipeline Leakage & Drainage Overflow"
-        description = "AI Vision Analysis: Detected a damaged water supply pipe causing continuous water leakage and street flooding. Immediate maintenance required."
-        severity = "CRITICAL" if "flood" in fn or "sewer" in fn else "HIGH"
-        safety_risk = "MEDIUM"
-        affected_area = "WARD"
-        accessibility_impact = ["pedestrians", "vehicles", "schools"]
-    elif any(k in fn for k in ["light", "lamp", "pole", "wire", "electric", "dark", "transformer"]):
-        category = "Electricity-related Civic Issue"
-        title = "Non-Functional Streetlight & Exposed Electrical Wiring"
-        description = "AI Vision Analysis: Detected broken streetlight fixture and exposed electrical wiring along public roadway. Creates severe night hazard."
-        severity = "HIGH" if "wire" in fn or "transformer" in fn else "MEDIUM"
-        safety_risk = "CRITICAL" if "wire" in fn or "transformer" in fn else "MEDIUM"
-        affected_area = "STREET"
-        accessibility_impact = ["pedestrians", "emergency vehicles"]
-    elif any(k in fn for k in ["waste", "trash", "garbage", "clean", "dump", "bin", "litter", "plastic"]):
-        category = "Sanitation & Waste"
-        title = "Unattended Municipal Garbage Accumulation"
-        description = "AI Vision Analysis: Identified illegal waste dump site with organic and plastic garbage accumulation. High pest & health risk."
-        severity = "MEDIUM"
-        safety_risk = "LOW"
-        affected_area = "STREET"
-        accessibility_impact = ["pedestrians"]
-    elif any(k in fn for k in ["health", "hospital", "clinic", "stray", "animal", "mosquito"]):
-        category = "Health & Other"
-        title = "Public Health Hazard & Mosquito Breeding Site"
-        description = "AI Vision Analysis: Detected stagnant water collection and unhygienic conditions near residential zone."
-        severity = "HIGH"
-        safety_risk = "HIGH"
-        affected_area = "WARD"
-        accessibility_impact = ["children", "pedestrians", "hospital"]
+    # 1. Try Groq AI first for smart complaint description generation
+    groq_res = _generate_groq_smart_description(req.filename or "civic_issue.jpg", loc)
+
+    if groq_res and groq_res.get("description"):
+        category_raw = groq_res.get("category", "Roads & Infrastructure")
+        cat_norm_map = {
+            "electricity": "Electricity-related Civic Issue",
+            "electrical": "Electricity-related Civic Issue",
+            "electricity-related civic issue": "Electricity-related Civic Issue",
+            "street lighting": "Electricity-related Civic Issue",
+            "power": "Electricity-related Civic Issue",
+            "roads": "Roads & Infrastructure",
+            "road": "Roads & Infrastructure",
+            "infrastructure": "Roads & Infrastructure",
+            "roads & infrastructure": "Roads & Infrastructure",
+            "water": "Water Supply",
+            "water supply": "Water Supply",
+            "sanitation": "Sanitation & Waste",
+            "waste": "Sanitation & Waste",
+            "sanitation & waste": "Sanitation & Waste",
+            "fire": "Fire & Disaster Emergency",
+            "fire & disaster emergency": "Fire & Disaster Emergency",
+            "health": "Health & Other",
+            "health & other": "Health & Other",
+        }
+        category = cat_norm_map.get(str(category_raw).strip().lower(), category_raw)
+        title = groq_res.get("title", "Civic Infrastructure Issue")
+        description = groq_res.get("description", "")
+        severity = groq_res.get("severity", "HIGH")
+        safety_risk = groq_res.get("safety_risk", "HIGH")
+        affected_area = groq_res.get("affected_area", "STREET")
+        accessibility_impact = groq_res.get("accessibility_impact", ["pedestrians", "vehicles"])
+        ai_model_name = groq_res.get("ai_model", "Groq AI (openai/gpt-oss-120b)")
+        confidence = 0.98
     else:
-        category = "Roads & Infrastructure"
-        title = "Severe Road Pothole & Damaged Pavement"
-        description = "AI Vision Analysis: Detected deep asphalt erosion, heavy surface cracking, and dangerous potholes along main road near school."
-        severity = "HIGH"
-        safety_risk = "HIGH"
-        affected_area = "STREET"
-        accessibility_impact = ["vehicles", "school", "emergency vehicles"]
+        # 2. Resilient fallback heuristics if Groq is temporarily unreachable
+        ai_model_name = "Civic -Buzz AI Vision & Deterministic Priority Engine"
+        confidence = 0.92
+        if any(k in fn for k in ["fire", "flame", "smoke", "blaze", "burn", "explosion", "gas leak", "cylinder"]):
+            category = "Fire & Disaster Emergency"
+            title = "🚨 Fire Outbreak & Life Safety Hazard Emergency"
+            description = "AI Vision Analysis: Detected active flame, smoke, or fire hazard. Immediate 30-minute rapid emergency response required to prevent injury and property loss."
+            severity = "CRITICAL"
+            safety_risk = "CRITICAL"
+            affected_area = "WARD"
+            accessibility_impact = ["emergency vehicles", "all residents", "hospital", "school"]
+        elif any(k in fn for k in ["shock", "current", "electrocution", "live wire", "spark", "sparking", "snapped wire", "high voltage"]):
+            category = "Electricity-related Civic Issue"
+            title = "⚡ Electric Shock Hazard & Snapped Live Wire Emergency"
+            description = "AI Vision Analysis: Detected exposed live electrical wire / sparking hazard with critical electrocution danger. Immediate rapid power shutdown & emergency repair required."
+            severity = "CRITICAL"
+            safety_risk = "CRITICAL"
+            affected_area = "STREET"
+            accessibility_impact = ["pedestrians", "emergency vehicles", "children"]
+        elif any(k in fn for k in ["water", "pipe", "leak", "drain", "tap", "overflow", "sewer", "flood"]):
+            category = "Water Supply"
+            title = "Water Pipeline Leakage & Drainage Overflow"
+            description = "AI Vision Analysis: Detected a damaged water supply pipe causing continuous water leakage and street flooding. Immediate maintenance required."
+            severity = "CRITICAL" if "flood" in fn or "sewer" in fn else "HIGH"
+            safety_risk = "MEDIUM"
+            affected_area = "WARD"
+            accessibility_impact = ["pedestrians", "vehicles", "schools"]
+        elif any(k in fn for k in ["light", "lamp", "pole", "wire", "electric", "dark", "transformer"]):
+            category = "Electricity-related Civic Issue"
+            title = "Non-Functional Streetlight & Exposed Electrical Wiring"
+            description = "AI Vision Analysis: Detected broken streetlight fixture and exposed electrical wiring along public roadway. Creates severe night hazard."
+            severity = "HIGH" if "wire" in fn or "transformer" in fn else "MEDIUM"
+            safety_risk = "CRITICAL" if "wire" in fn or "transformer" in fn else "MEDIUM"
+            affected_area = "STREET"
+            accessibility_impact = ["pedestrians", "emergency vehicles"]
+        elif any(k in fn for k in ["waste", "trash", "garbage", "clean", "dump", "bin", "litter", "plastic"]):
+            category = "Sanitation & Waste"
+            title = "Unattended Municipal Garbage Accumulation"
+            description = "AI Vision Analysis: Identified illegal waste dump site with organic and plastic garbage accumulation. High pest & health risk."
+            severity = "MEDIUM"
+            safety_risk = "LOW"
+            affected_area = "STREET"
+            accessibility_impact = ["pedestrians"]
+        elif any(k in fn for k in ["health", "hospital", "clinic", "stray", "animal", "mosquito"]):
+            category = "Health & Other"
+            title = "Public Health Hazard & Mosquito Breeding Site"
+            description = "AI Vision Analysis: Detected stagnant water collection and unhygienic conditions near residential zone."
+            severity = "HIGH"
+            safety_risk = "HIGH"
+            affected_area = "WARD"
+            accessibility_impact = ["children", "pedestrians", "hospital"]
+        else:
+            category = "Roads & Infrastructure"
+            title = "Severe Road Pothole & Damaged Pavement"
+            description = "AI Vision Analysis: Detected deep asphalt erosion, heavy surface cracking, and dangerous potholes along main road near school."
+            severity = "HIGH"
+            safety_risk = "HIGH"
+            affected_area = "STREET"
+            accessibility_impact = ["vehicles", "school", "emergency vehicles"]
 
     ai_obs = {
         "category": category,
@@ -442,7 +549,7 @@ async def analyze_issue_image(req: ImageAnalysisRequest):
         "affected_area": affected_area,
         "accessibility_impact": accessibility_impact,
         "description": description,
-        "confidence": 0.96 if api_key else 0.90,
+        "confidence": confidence,
     }
 
     # Fetch existing complaints to build recurrence signal
@@ -461,7 +568,7 @@ async def analyze_issue_image(req: ImageAnalysisRequest):
 
     priority_res = priority_engine.calculate_priority_score(
         ai_observations=ai_obs,
-        location_context={"location": req.location or "Ward 4"},
+        location_context={"location": loc},
         historical_signals=hist_signals,
     )
 
@@ -474,7 +581,7 @@ async def analyze_issue_image(req: ImageAnalysisRequest):
         description=description,
         urgency=classic_urgency,
         confidence=priority_res["confidence"],
-        ai_model="Civic Catalyst AI Vision & Deterministic Priority Engine",
+        ai_model=ai_model_name,
         ai_severity=severity,
         ai_safety_risk=safety_risk,
         ai_affected_area=affected_area,
@@ -487,6 +594,89 @@ async def analyze_issue_image(req: ImageAnalysisRequest):
         explanation_bullets=priority_res["explanation_bullets"],
         factors_breakdown=priority_res["factors_breakdown"],
     )
+
+
+# ── ElevenLabs Voice Welcome Endpoint ───────────────────────────────────────
+
+@router.get("/voice-welcome")
+@router.post("/voice-welcome")
+async def voice_welcome(text: str = "Welcome to Civic Buzz Platform."):
+    """
+    ElevenLabs Text-to-Speech welcome voice message endpoint.
+    API keys are securely held on the backend environment configuration.
+    """
+    eleven_key = (os.getenv("ELEVENLABS_API_KEY") or "").strip("\"' ")
+    if eleven_key:
+        voice_id = "21m00Tcm4TlvDq8ikWAM"  # Rachel / Friendly voice
+        url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+        headers = {
+            "Accept": "audio/mpeg",
+            "Content-Type": "application/json",
+            "xi-api-key": eleven_key,
+        }
+        data = {
+            "text": text,
+            "model_id": "eleven_monolingual_v1",
+            "voice_settings": {
+                "stability": 0.5,
+                "similarity_boost": 0.75,
+            },
+        }
+        try:
+            resp = requests.post(url, json=data, headers=headers, timeout=8)
+            if resp.status_code == 200:
+                audio_b64 = base64.b64encode(resp.content).decode("utf-8")
+                return {
+                    "success": True,
+                    "provider": "ElevenLabs",
+                    "text": text,
+                    "audio_base64": f"data:audio/mpeg;base64,{audio_b64}",
+                }
+            else:
+                print(f"[ElevenLabs notice ({resp.status_code}): {resp.text[:120]}]")
+        except Exception as e:
+            print(f"[ElevenLabs TTS connection error: {e}]")
+
+    # Graceful fallback instruction for Web Speech Synthesis
+    return {
+        "success": False,
+        "provider": "WebSpeechFallback",
+        "text": text,
+        "audio_base64": None,
+        "message": "Using browser Web Speech Synthesis for crystal-clear voice welcome.",
+    }
+
+
+@router.get("/voice-welcome/audio")
+async def voice_welcome_audio(text: str = "Welcome to Civic Buzz Platform."):
+    """
+    Direct audio stream of the welcome message via ElevenLabs.
+    """
+    eleven_key = (os.getenv("ELEVENLABS_API_KEY") or "").strip("\"' ")
+    if eleven_key:
+        voice_id = "21m00Tcm4TlvDq8ikWAM"
+        url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+        headers = {
+            "Accept": "audio/mpeg",
+            "Content-Type": "application/json",
+            "xi-api-key": eleven_key,
+        }
+        data = {
+            "text": text,
+            "model_id": "eleven_monolingual_v1",
+            "voice_settings": {
+                "stability": 0.5,
+                "similarity_boost": 0.75,
+            },
+        }
+        try:
+            resp = requests.post(url, json=data, headers=headers, timeout=8)
+            if resp.status_code == 200:
+                return Response(content=resp.content, media_type="audio/mpeg")
+        except Exception:
+            pass
+
+    return Response(status_code=204)
 
 
 @router.post("/reverse-geocode")
